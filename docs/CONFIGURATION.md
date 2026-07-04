@@ -16,6 +16,7 @@ parameters below.
 | **Absolute Max Price** | 0–1,000,000 | 10,000 | Used only when Price Cap Mode is **off**. Same ceiling for every ware. |
 | **Max Discount %** | 0–95 | 20 | Used only when Price Cap Mode is **on**. Won't buy a ware for more than `(home station's price for that ware) × (1 − this% )`. |
 | **Scan Performance** | 1–15 | 5 | How many offer checks run per simulation tick before yielding. Lower this if you assign the order to many ships simultaneously and notice stutter; raise it for faster reactions on a lightly-loaded save. |
+| **Enable Logbook Entries** | on/off | on | Writes a Logbook entry (Menu → Logbook) for every completed delivery: ware, amount, seller, price, total cost, and home station, with a "show on map" link. Turn off if you're running many traders and don't want the Logbook flooded. |
 
 ## Priority mode vs. Balanced mode
 

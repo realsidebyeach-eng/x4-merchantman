@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="1">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="2">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -43,6 +43,7 @@
 				<input_param name="max" value="15"/>
 				<input_param name="step" value="1"/>
 			</param>
+			<param name="enablelogbook" default="true" type="bool" text="{8834271,109}" comment="Write a logbook entry for every delivery."/>
 		</params>
 		<skill min="15"/>
 		<requires>
@@ -70,6 +71,11 @@
 			</do_if>
 		</do_if>
 	</init>
+	<patch sinceversion="2">
+		<do_if value="$enablelogbook == null">
+			<set_value name="$enablelogbook" exact="true"/>
+		</do_if>
+	</patch>
 	<attention min="unknown">
 		<actions>
 			<label name="verystart"/>
@@ -222,6 +228,9 @@
 										<create_trade_order name="$bestseller" object="this.object" tradeoffer="$bestseller" amount="$amount" immediate="false"/>
 										<!-- Sell leg: deliver straight into the home station's own buy offer. -->
 										<create_trade_order name="$wantedoffer" object="this.object" tradeoffer="$wantedoffer" amount="$amount" immediate="false"/>
+										<do_if value="$enablelogbook">
+											<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$amount*$bestprice" text="{8834271,300}.[$amount,$ware,$bestseller.seller,$bestprice,$amount*$bestprice,$homestation]"/>
+										</do_if>
 									</do_if>
 								</do_if>
 								<remove_value name="$foundsellers"/>
