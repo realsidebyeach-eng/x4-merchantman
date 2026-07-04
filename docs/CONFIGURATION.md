@@ -18,6 +18,7 @@ parameters below.
 | **Max Discount %** | 1–99 | 90 | Used only when Price Cap Mode is **on**. Skips a deal if it's discounted by *more* than this — a sanity guard against implausible outlier prices. Must be greater than Min Discount % or nothing will ever qualify. |
 | **Scan Performance** | 1–15 | 5 | How many offer checks run per simulation tick before yielding. Lower this if you assign the order to many ships simultaneously and notice stutter; raise it for faster reactions on a lightly-loaded save. |
 | **Enable Logbook Entries** | on/off | on | Writes a Logbook entry (Menu → Logbook) for every completed delivery: ware, amount, seller, price, total cost, and home station, with a "show on map" link. Turn off if you're running many traders and don't want the Logbook flooded. |
+| **Enable Debug Log** | on/off | off | Writes a detailed trace to a log file every pass — see [Debugging](#debugging) below. Leave off during normal play; turn on only while troubleshooting a specific ship. |
 
 ## Priority mode vs. Balanced mode
 
@@ -103,3 +104,33 @@ station currently wants, never paying more than 50cr/unit for any of them.
 - **No trade orders queue up even though a valid deal was found**: the ship
   caps itself at 6 simultaneous queued trade orders at a time (to avoid
   runaway queuing); wait for existing orders to clear.
+- **A deal you can see on the map isn't being taken, and none of the above
+  explains it**: turn on Enable Debug Log and read the trace (see below) —
+  it tells you exactly how many sectors were searched, how many sellers
+  were found for that ware, and either the seller it picked or the
+  cheapest price it saw that still fell outside the accepted band.
+
+## Debugging
+
+Turning on **Enable Debug Log** writes one line per decision to
+`<X4 user data folder>/StationTrader/<ship idcode>.txt` (the same
+`debug_to_file` mechanism vanilla X4 and most script mods use — on this
+machine that's under `~/.config/EgoSoft/X4/` for the native Linux build,
+or your `Documents/Egosoft/X4` folder on Windows; exact subpath depends on
+your X4 logging configuration). Each pass logs:
+
+- how many of the home station's buy offers matched your Ware Priority
+  List;
+- which sectors were included in the search this pass;
+- per ware: the computed price band, how many accessible sellers were
+  found, and either which one was picked (and at what price) or the
+  cheapest price seen if nothing qualified;
+- the final purchase amount and the four numbers it was capped by (cargo
+  space, seller's stock, home station's demand, affordable quantity) —
+  useful if a seller was picked but no trade order actually appeared;
+- a note if the ship skipped remaining wares because it already had 6
+  trade orders queued.
+
+Turn it back off once you're done — it writes on every pass for every
+ware, so leaving it on across a long play session will grow the log file
+continuously.

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="3">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="4">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -52,6 +52,7 @@
 				<input_param name="step" value="1"/>
 			</param>
 			<param name="enablelogbook" default="true" type="bool" text="{8834271,109}" comment="Write a logbook entry for every delivery."/>
+			<param name="debugtrace" default="false" type="bool" text="{8834271,111}" comment="Write troubleshooting details to a log file (Documents/Egosoft/X4/.../StationTrader/)."/>
 		</params>
 		<skill min="15"/>
 		<requires>
@@ -92,6 +93,11 @@
 			<set_value name="$maxpercent" exact="90"/>
 		</do_if>
 	</patch>
+	<patch sinceversion="4">
+		<do_if value="$debugtrace == null">
+			<set_value name="$debugtrace" exact="false"/>
+		</do_if>
+	</patch>
 	<attention min="unknown">
 		<actions>
 			<label name="verystart"/>
@@ -102,7 +108,7 @@
 			<set_command command="command.searchtrades"/>
 			<set_command_action commandaction="commandaction.searchingtrades"/>
 
-			<!-- Rebuild the jump-range search space from every home station's sector each pass, so a live edit to Max Jump Range takes effect on the next cycle. Hostile-owned sectors are excluded as unreachable/unsafe. -->
+			<!-- Rebuild the jump-range search space from every home station's sector each pass, so a live edit to Max Jump Range takes effect on the next cycle. We don't pre-filter by sector ownership here - contested/pirate-owned sectors can still contain stations you have real docking rights at, so that's left entirely to the per-station match_relation_to check below. -->
 			<create_list name="$searchspaces"/>
 			<do_all exact="$home.count" counter="$h">
 				<set_value name="$homestation" exact="$home.{$h}"/>
@@ -119,10 +125,8 @@
 						<find_sector name="$secs" space="$clusterkeys.{$c}" multiple="true"/>
 						<do_all exact="$secs.count" counter="$s">
 							<set_value name="$sec" exact="$secs.{$s}"/>
-							<do_if value="faction.player.relationto.{$sec.trueowner} gt -0.32">
-								<do_if value="not $searchspaces.indexof.{$sec}">
-									<append_to_list name="$searchspaces" exact="$sec"/>
-								</do_if>
+							<do_if value="not $searchspaces.indexof.{$sec}">
+								<append_to_list name="$searchspaces" exact="$sec"/>
 							</do_if>
 						</do_all>
 						<remove_value name="$secs"/>
@@ -136,6 +140,9 @@
 					<remove_value name="$clusterkeys"/>
 				</do_if>
 			</do_all>
+			<do_if value="$debugtrace">
+				<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Search spaces this pass ('+$searchspaces.count+'): '+$searchspaces" output="false" append="true" chance="100"/>
+			</do_if>
 
 			<!-- Process every assigned home station in turn. -->
 			<do_all exact="$home.count" counter="$h2">
@@ -151,6 +158,9 @@
 							<append_to_list name="$wantedoffers" exact="$candidate"/>
 						</do_if>
 					</do_all>
+					<do_if value="$debugtrace">
+						<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': '+$homebuyoffers.count+' total buy offers, '+$wantedoffers.count+' match the ware priority list.'" output="false" append="true" chance="100"/>
+					</do_if>
 
 					<do_if value="$wantedoffers.count gt 0">
 
@@ -192,6 +202,9 @@
 									<set_value name="$pricefloor" exact="$refprice*(100-$maxpercent)/100"/>
 									<remove_value name="$homesell"/>
 								</do_if>
+								<do_if value="$debugtrace">
+									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': refprice='+$refprice+' band=['+$pricefloor+','+$priceceiling+']'" output="false" append="true" chance="100"/>
+								</do_if>
 
 								<!-- Search every sector in range for accessible sellers of this ware. -->
 								<create_list name="$foundsellers"/>
@@ -210,20 +223,35 @@
 										<wait exact="1ms"/>
 									</do_if>
 								</do_all>
+								<do_if value="$debugtrace">
+									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': '+$foundsellers.count+' accessible seller(s) found across '+$searchspaces.count+' sector(s).'" output="false" append="true" chance="100"/>
+								</do_if>
 
 								<!-- Pick the cheapest offer within the acceptable band [$pricefloor, $priceceiling], excluding the home station selling to itself. -->
 								<set_value name="$bestseller" exact="0"/>
 								<set_value name="$bestprice" exact="$priceceiling"/>
+								<set_value name="$cheapestseen" exact="0"/>
 								<do_all exact="$foundsellers.count" counter="$fs">
 									<set_value name="$candoffer" exact="$foundsellers.{$fs}"/>
 									<do_if value="not ($candoffer.seller == $homestation)">
 										<set_value name="$candprice" exact="$candoffer.unitprice/100"/>
+										<do_if value="$debugtrace and (($cheapestseen == 0) or ($candprice lt $cheapestseen))">
+											<set_value name="$cheapestseen" exact="$candprice"/>
+										</do_if>
 										<do_if value="($candprice le $bestprice) and ($candprice ge $pricefloor)">
 											<set_value name="$bestseller" exact="$candoffer"/>
 											<set_value name="$bestprice" exact="$candprice"/>
 										</do_if>
 									</do_if>
 								</do_all>
+								<do_if value="$debugtrace">
+									<do_if value="not ($bestseller == 0)">
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': picked '+$bestseller.seller.knownname+' at '+$bestprice+'cr/unit.'" output="false" append="true" chance="100"/>
+									</do_if>
+									<do_else>
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': no seller in band. Cheapest seen was '+$cheapestseen+'cr/unit (band was ['+$pricefloor+','+$priceceiling+']).'" output="false" append="true" chance="100"/>
+									</do_else>
+								</do_if>
 
 								<do_if value="not ($bestseller == 0)">
 									<set_value name="$spendablemoney" exact="player.money/100"/>
@@ -240,6 +268,9 @@
 									</do_if>
 
 									<set_value name="$amount" exact="[$cargocap,$bestseller.amount,$wantedoffer.amount,$spendablemoney/(2*$bestprice)].min"/>
+									<do_if value="$debugtrace">
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': amount='+$amount+' (cargocap='+$cargocap+', sellerhas='+$bestseller.amount+', homewants='+$wantedoffer.amount+', afford='+($spendablemoney/(2*$bestprice))+')'" output="false" append="true" chance="100"/>
+									</do_if>
 
 									<do_if value="$amount gt 0">
 										<!-- Buy leg: purchase from the cheapest accessible seller. -->
@@ -253,6 +284,11 @@
 								</do_if>
 								<remove_value name="$foundsellers"/>
 							</do_if>
+							<do_else>
+								<do_if value="$debugtrace">
+									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  Skipping remaining wares this pass - already have '+this.ship.tradeorders.count+' queued trade orders.'" output="false" append="true" chance="100"/>
+								</do_if>
+							</do_else>
 
 							<set_value name="$scantick" exact="$scantick+1"/>
 							<do_if value="$scantick gt $scantickrate">
