@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="7">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="8">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -16,6 +16,8 @@
 			</param>
 			<!-- Priority (false) fills the top ware fully before moving to the next. Balanced (true) gives every wanted ware a fair cargo share each pass. -->
 			<param name="balanced" default="false" type="bool" text="{8834271,103}" comment="Spread purchases evenly across wares instead of strict priority."/>
+			<!-- true: buy from every wanted ware until the hold is full (or nothing more is available/affordable), then deliver everything home in one go. false: classic immediate buy-then-deliver, one ware at a time. -->
+			<param name="fillcargo" default="true" type="bool" text="{8834271,112}" comment="Fill the cargo hold across all wanted wares before returning home to deliver."/>
 			<!-- How many jumps from a home station's own sector we are willing to search for a cheap seller. -->
 			<param name="maxjumps" default="3" type="number" text="{8834271,104}" comment="Max jump range from home.">
 				<input_param name="startvalue" value="3"/>
@@ -82,6 +84,11 @@
 	<patch sinceversion="4">
 		<do_if value="$debugtrace == null">
 			<set_value name="$debugtrace" exact="false"/>
+		</do_if>
+	</patch>
+	<patch sinceversion="8">
+		<do_if value="$fillcargo == null">
+			<set_value name="$fillcargo" exact="true"/>
 		</do_if>
 	</patch>
 	<attention min="unknown">
@@ -186,120 +193,250 @@
 							<set_value name="$processoffers" exact="$wantedoffers"/>
 						</do_else>
 
-						<do_all exact="$processoffers.count" counter="$w">
-							<do_if value="this.ship.tradeorders.count lt 6">
-								<set_value name="$wantedoffer" exact="$processoffers.{$w}"/>
-								<set_value name="$ware" exact="$wantedoffer.ware"/>
+						<do_if value="$fillcargo">
+							<!-- Fill-cargo mode: buy from every wanted ware first (tracking a running cargo-space and credit budget across the whole pass), then deliver everything home in one batch at the end. Only stops early if the hold fills up, the budget runs out, or no wanted ware has a valid seller left - i.e. only "returns short" when wares genuinely aren't available. -->
+							<create_list name="$deliverwares"/>
+							<create_list name="$deliveramounts"/>
+							<create_list name="$deliversellers"/>
+							<create_list name="$deliverprices"/>
+							<set_value name="$seedware" exact="$processoffers.{1}.ware"/>
+							<set_value name="$remainingvolume" exact="this.ship.cargo.{$seedware}.free * $seedware.volume"/>
+							<set_value name="$remainingbudget" exact="player.money/100"/>
+							<do_if value="this.ship.commander">
+								<do_if value="this.ship.commander.hasownaccount and this.ship.commander.money gt 0">
+									<set_value name="$remainingbudget" exact="this.ship.commander.money/100"/>
+								</do_if>
+							</do_if>
+							<do_if value="$debugtrace">
+								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': fill pass starting with '+$remainingvolume+'m3 free cargo, '+$remainingbudget+'cr spendable, '+$processoffers.count+' wanted ware(s).'" output="false" append="true" chance="100"/>
+							</do_if>
 
-								<!-- Work out this ware's price ceiling: reject anything pricier (not discounted enough to be worth the trip). -->
-								<set_value name="$priceceiling" exact="$maxprice"/>
-								<do_if value="$usepercentcap">
-									<find_sell_offer seller="$homestation" result="$homesell" wares="$ware" multiple="true"/>
-									<do_if value="$homesell.count gt 0">
-										<set_value name="$refprice" exact="$homesell.{1}.unitprice/100"/>
+							<do_all exact="$processoffers.count" counter="$w">
+								<do_if value="(this.ship.tradeorders.count lt 6) and ($remainingvolume gt 0) and ($remainingbudget gt 0)">
+									<set_value name="$wantedoffer" exact="$processoffers.{$w}"/>
+									<set_value name="$ware" exact="$wantedoffer.ware"/>
+
+									<!-- Work out this ware's price ceiling: reject anything pricier (not discounted enough to be worth the trip). -->
+									<set_value name="$priceceiling" exact="$maxprice"/>
+									<do_if value="$usepercentcap">
+										<find_sell_offer seller="$homestation" result="$homesell" wares="$ware" multiple="true"/>
+										<do_if value="$homesell.count gt 0">
+											<set_value name="$refprice" exact="$homesell.{1}.unitprice/100"/>
+										</do_if>
+										<do_else>
+											<!-- Home station has no active sell offer for this ware right now; fall back to what it is currently offering to pay for it. -->
+											<set_value name="$refprice" exact="$wantedoffer.unitprice/100"/>
+										</do_else>
+										<set_value name="$priceceiling" exact="$refprice*(100-$minpercent)/100"/>
+										<remove_value name="$homesell"/>
 									</do_if>
-									<do_else>
-										<!-- Home station has no active sell offer for this ware right now; fall back to what it is currently offering to pay for it. -->
-										<set_value name="$refprice" exact="$wantedoffer.unitprice/100"/>
-									</do_else>
-									<set_value name="$priceceiling" exact="$refprice*(100-$minpercent)/100"/>
-									<remove_value name="$homesell"/>
-								</do_if>
-								<do_if value="$debugtrace">
-									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': refprice='+$refprice+' priceceiling='+$priceceiling" output="false" append="true" chance="100"/>
-								</do_if>
 
-								<!-- Search every sector in range for accessible sellers of this ware. -->
-								<create_list name="$foundsellers"/>
-								<do_all exact="$searchspaces.count" counter="$sp">
-									<find_sell_offer tradepartner="this.ship" space="$searchspaces.{$sp}" result="$sellers" wares="$ware" multiple="true">
-										<match_seller tradesknownto="this.owner">
-											<match_relation_to object="this.ship" relation="dock" comparison="ge"/>
-											<match_use_blacklist group="$blacklistgroup" type="blacklisttype.objectactivity" object="this.ship"/>
-										</match_seller>
-									</find_sell_offer>
-									<do_all exact="$sellers.count" counter="$se">
-										<append_to_list name="$foundsellers" exact="$sellers.{$se}"/>
+									<!-- Search every sector in range for accessible sellers of this ware. -->
+									<create_list name="$foundsellers"/>
+									<do_all exact="$searchspaces.count" counter="$sp">
+										<find_sell_offer tradepartner="this.ship" space="$searchspaces.{$sp}" result="$sellers" wares="$ware" multiple="true">
+											<match_seller tradesknownto="this.owner">
+												<match_relation_to object="this.ship" relation="dock" comparison="ge"/>
+												<match_use_blacklist group="$blacklistgroup" type="blacklisttype.objectactivity" object="this.ship"/>
+											</match_seller>
+										</find_sell_offer>
+										<do_all exact="$sellers.count" counter="$se">
+											<append_to_list name="$foundsellers" exact="$sellers.{$se}"/>
+										</do_all>
+										<set_value name="$scantick" exact="$scantick+1"/>
+										<do_if value="$scantick gt $scantickrate">
+											<set_value name="$scantick" exact="0"/>
+											<wait exact="1ms"/>
+										</do_if>
 									</do_all>
-									<set_value name="$scantick" exact="$scantick+1"/>
-									<do_if value="$scantick gt $scantickrate">
-										<set_value name="$scantick" exact="0"/>
-										<wait exact="1ms"/>
-									</do_if>
-								</do_all>
-								<do_if value="$debugtrace">
-									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': '+$foundsellers.count+' accessible seller(s) found across '+$searchspaces.count+' sector(s).'" output="false" append="true" chance="100"/>
-								</do_if>
 
-								<!-- Pick the cheapest offer at or below the price ceiling, excluding the home station selling to itself. -->
-								<set_value name="$bestseller" exact="0"/>
-								<set_value name="$bestprice" exact="$priceceiling"/>
-								<set_value name="$cheapestseen" exact="0"/>
-								<do_all exact="$foundsellers.count" counter="$fs">
-									<set_value name="$candoffer" exact="$foundsellers.{$fs}"/>
-									<do_if value="not ($candoffer.seller == $homestation)">
-										<set_value name="$candprice" exact="$candoffer.unitprice/100"/>
-										<do_if value="$debugtrace and (($cheapestseen == 0) or ($candprice lt $cheapestseen))">
-											<set_value name="$cheapestseen" exact="$candprice"/>
+									<!-- Pick the cheapest offer at or below the price ceiling, excluding the home station selling to itself. -->
+									<set_value name="$bestseller" exact="0"/>
+									<set_value name="$bestprice" exact="$priceceiling"/>
+									<set_value name="$cheapestseen" exact="0"/>
+									<do_all exact="$foundsellers.count" counter="$fs">
+										<set_value name="$candoffer" exact="$foundsellers.{$fs}"/>
+										<do_if value="not ($candoffer.seller == $homestation)">
+											<set_value name="$candprice" exact="$candoffer.unitprice/100"/>
+											<do_if value="$debugtrace and (($cheapestseen == 0) or ($candprice lt $cheapestseen))">
+												<set_value name="$cheapestseen" exact="$candprice"/>
+											</do_if>
+											<do_if value="$candprice le $bestprice">
+												<set_value name="$bestseller" exact="$candoffer"/>
+												<set_value name="$bestprice" exact="$candprice"/>
+											</do_if>
 										</do_if>
-										<do_if value="$candprice le $bestprice">
-											<set_value name="$bestseller" exact="$candoffer"/>
-											<set_value name="$bestprice" exact="$candprice"/>
-										</do_if>
-									</do_if>
-								</do_all>
-								<do_if value="$debugtrace">
+									</do_all>
+
 									<do_if value="not ($bestseller == 0)">
-										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': picked '+$bestseller.seller.knownname+' at '+$bestprice+'cr/unit.'" output="false" append="true" chance="100"/>
+										<set_value name="$wareunitcap" exact="$remainingvolume/$ware.volume"/>
+										<do_if value="$balanced">
+											<!-- Fair-share cap across whatever wares are still left to consider this pass. -->
+											<set_value name="$remainingcount" exact="$processoffers.count-$w+1"/>
+											<set_value name="$wareunitcap" exact="[$wareunitcap/$remainingcount,1].max"/>
+										</do_if>
+
+										<set_value name="$amount" exact="[$wareunitcap,$bestseller.amount,$wantedoffer.amount,$remainingbudget/$bestprice].min"/>
+										<do_if value="$debugtrace">
+											<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': picked '+$bestseller.seller.knownname+' at '+$bestprice+'cr/unit, amount='+$amount+' (wareunitcap='+$wareunitcap+', sellerhas='+$bestseller.amount+', homewants='+$wantedoffer.amount+', afford='+($remainingbudget/$bestprice)+')'" output="false" append="true" chance="100"/>
+										</do_if>
+
+										<do_if value="$amount gt 0">
+											<!-- Buy leg now; the matching sell/deliver leg is queued after the whole hold is filled. -->
+											<create_trade_order name="$bestseller" object="this.object" tradeoffer="$bestseller" amount="$amount" immediate="false"/>
+											<append_to_list name="$deliverwares" exact="$wantedoffer"/>
+											<append_to_list name="$deliveramounts" exact="$amount"/>
+											<append_to_list name="$deliversellers" exact="$bestseller.seller"/>
+											<append_to_list name="$deliverprices" exact="$bestprice"/>
+											<set_value name="$remainingvolume" exact="$remainingvolume-($amount*$ware.volume)"/>
+											<set_value name="$remainingbudget" exact="$remainingbudget-($amount*$bestprice)"/>
+										</do_if>
 									</do_if>
-									<do_else>
+									<do_elseif value="$debugtrace">
 										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': no seller under ceiling. Cheapest seen was '+$cheapestseen+'cr/unit (ceiling was '+$priceceiling+').'" output="false" append="true" chance="100"/>
-									</do_else>
+									</do_elseif>
+									<remove_value name="$foundsellers"/>
 								</do_if>
 
-								<do_if value="not ($bestseller == 0)">
-									<set_value name="$spendablemoney" exact="player.money/100"/>
-									<do_if value="this.ship.commander">
-										<do_if value="this.ship.commander.hasownaccount and this.ship.commander.money gt 0">
-											<set_value name="$spendablemoney" exact="this.ship.commander.money/100"/>
+								<set_value name="$scantick" exact="$scantick+1"/>
+								<do_if value="$scantick gt $scantickrate">
+									<set_value name="$scantick" exact="0"/>
+									<wait exact="1ms"/>
+								</do_if>
+							</do_all>
+
+							<!-- Hold is as full as it's going to get this pass (or we ran out of wares/budget) - deliver everything bought in one batch. -->
+							<do_if value="$debugtrace">
+								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': fill pass done, delivering '+$deliverwares.count+' ware type(s) home in one trip ('+$remainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
+							</do_if>
+							<do_all exact="$deliverwares.count" counter="$d">
+								<create_trade_order name="$deliverwares.{$d}" object="this.object" tradeoffer="$deliverwares.{$d}" amount="$deliveramounts.{$d}" immediate="false"/>
+								<do_if value="$enablelogbook">
+									<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$deliveramounts.{$d}*$deliverprices.{$d}" text="{8834271,300}.[$deliveramounts.{$d},$deliverwares.{$d}.ware,$deliversellers.{$d},$deliverprices.{$d},$deliveramounts.{$d}*$deliverprices.{$d},$homestation]"/>
+								</do_if>
+							</do_all>
+							<remove_value name="$deliverwares"/>
+							<remove_value name="$deliveramounts"/>
+							<remove_value name="$deliversellers"/>
+							<remove_value name="$deliverprices"/>
+						</do_if>
+						<do_else>
+							<!-- Classic mode: buy and immediately deliver one ware at a time. -->
+							<do_all exact="$processoffers.count" counter="$w">
+								<do_if value="this.ship.tradeorders.count lt 6">
+									<set_value name="$wantedoffer" exact="$processoffers.{$w}"/>
+									<set_value name="$ware" exact="$wantedoffer.ware"/>
+
+									<!-- Work out this ware's price ceiling: reject anything pricier (not discounted enough to be worth the trip). -->
+									<set_value name="$priceceiling" exact="$maxprice"/>
+									<do_if value="$usepercentcap">
+										<find_sell_offer seller="$homestation" result="$homesell" wares="$ware" multiple="true"/>
+										<do_if value="$homesell.count gt 0">
+											<set_value name="$refprice" exact="$homesell.{1}.unitprice/100"/>
 										</do_if>
+										<do_else>
+											<!-- Home station has no active sell offer for this ware right now; fall back to what it is currently offering to pay for it. -->
+											<set_value name="$refprice" exact="$wantedoffer.unitprice/100"/>
+										</do_else>
+										<set_value name="$priceceiling" exact="$refprice*(100-$minpercent)/100"/>
+										<remove_value name="$homesell"/>
 									</do_if>
-
-									<set_value name="$cargocap" exact="this.ship.cargo.{$ware}.free"/>
-									<do_if value="$balanced">
-										<!-- Fair-share cap: don't let one ware use the whole hold this pass. -->
-										<set_value name="$cargocap" exact="[$cargocap/$processoffers.count,1].max"/>
-									</do_if>
-
-									<set_value name="$amount" exact="[$cargocap,$bestseller.amount,$wantedoffer.amount,$spendablemoney/(2*$bestprice)].min"/>
 									<do_if value="$debugtrace">
-										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': amount='+$amount+' (cargocap='+$cargocap+', sellerhas='+$bestseller.amount+', homewants='+$wantedoffer.amount+', afford='+($spendablemoney/(2*$bestprice))+')'" output="false" append="true" chance="100"/>
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': refprice='+$refprice+' priceceiling='+$priceceiling" output="false" append="true" chance="100"/>
 									</do_if>
 
-									<do_if value="$amount gt 0">
-										<!-- Buy leg: purchase from the cheapest accessible seller. -->
-										<create_trade_order name="$bestseller" object="this.object" tradeoffer="$bestseller" amount="$amount" immediate="false"/>
-										<!-- Sell leg: deliver straight into the home station's own buy offer. -->
-										<create_trade_order name="$wantedoffer" object="this.object" tradeoffer="$wantedoffer" amount="$amount" immediate="false"/>
-										<do_if value="$enablelogbook">
-											<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$amount*$bestprice" text="{8834271,300}.[$amount,$ware,$bestseller.seller,$bestprice,$amount*$bestprice,$homestation]"/>
+									<!-- Search every sector in range for accessible sellers of this ware. -->
+									<create_list name="$foundsellers"/>
+									<do_all exact="$searchspaces.count" counter="$sp">
+										<find_sell_offer tradepartner="this.ship" space="$searchspaces.{$sp}" result="$sellers" wares="$ware" multiple="true">
+											<match_seller tradesknownto="this.owner">
+												<match_relation_to object="this.ship" relation="dock" comparison="ge"/>
+												<match_use_blacklist group="$blacklistgroup" type="blacklisttype.objectactivity" object="this.ship"/>
+											</match_seller>
+										</find_sell_offer>
+										<do_all exact="$sellers.count" counter="$se">
+											<append_to_list name="$foundsellers" exact="$sellers.{$se}"/>
+										</do_all>
+										<set_value name="$scantick" exact="$scantick+1"/>
+										<do_if value="$scantick gt $scantickrate">
+											<set_value name="$scantick" exact="0"/>
+											<wait exact="1ms"/>
+										</do_if>
+									</do_all>
+									<do_if value="$debugtrace">
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': '+$foundsellers.count+' accessible seller(s) found across '+$searchspaces.count+' sector(s).'" output="false" append="true" chance="100"/>
+									</do_if>
+
+									<!-- Pick the cheapest offer at or below the price ceiling, excluding the home station selling to itself. -->
+									<set_value name="$bestseller" exact="0"/>
+									<set_value name="$bestprice" exact="$priceceiling"/>
+									<set_value name="$cheapestseen" exact="0"/>
+									<do_all exact="$foundsellers.count" counter="$fs">
+										<set_value name="$candoffer" exact="$foundsellers.{$fs}"/>
+										<do_if value="not ($candoffer.seller == $homestation)">
+											<set_value name="$candprice" exact="$candoffer.unitprice/100"/>
+											<do_if value="$debugtrace and (($cheapestseen == 0) or ($candprice lt $cheapestseen))">
+												<set_value name="$cheapestseen" exact="$candprice"/>
+											</do_if>
+											<do_if value="$candprice le $bestprice">
+												<set_value name="$bestseller" exact="$candoffer"/>
+												<set_value name="$bestprice" exact="$candprice"/>
+											</do_if>
+										</do_if>
+									</do_all>
+									<do_if value="$debugtrace">
+										<do_if value="not ($bestseller == 0)">
+											<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': picked '+$bestseller.seller.knownname+' at '+$bestprice+'cr/unit.'" output="false" append="true" chance="100"/>
+										</do_if>
+										<do_else>
+											<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': no seller under ceiling. Cheapest seen was '+$cheapestseen+'cr/unit (ceiling was '+$priceceiling+').'" output="false" append="true" chance="100"/>
+										</do_else>
+									</do_if>
+
+									<do_if value="not ($bestseller == 0)">
+										<set_value name="$spendablemoney" exact="player.money/100"/>
+										<do_if value="this.ship.commander">
+											<do_if value="this.ship.commander.hasownaccount and this.ship.commander.money gt 0">
+												<set_value name="$spendablemoney" exact="this.ship.commander.money/100"/>
+											</do_if>
+										</do_if>
+
+										<set_value name="$cargocap" exact="this.ship.cargo.{$ware}.free"/>
+										<do_if value="$balanced">
+											<!-- Fair-share cap: don't let one ware use the whole hold this pass. -->
+											<set_value name="$cargocap" exact="[$cargocap/$processoffers.count,1].max"/>
+										</do_if>
+
+										<set_value name="$amount" exact="[$cargocap,$bestseller.amount,$wantedoffer.amount,$spendablemoney/(2*$bestprice)].min"/>
+										<do_if value="$debugtrace">
+											<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': amount='+$amount+' (cargocap='+$cargocap+', sellerhas='+$bestseller.amount+', homewants='+$wantedoffer.amount+', afford='+($spendablemoney/(2*$bestprice))+')'" output="false" append="true" chance="100"/>
+										</do_if>
+
+										<do_if value="$amount gt 0">
+											<!-- Buy leg: purchase from the cheapest accessible seller. -->
+											<create_trade_order name="$bestseller" object="this.object" tradeoffer="$bestseller" amount="$amount" immediate="false"/>
+											<!-- Sell leg: deliver straight into the home station's own buy offer. -->
+											<create_trade_order name="$wantedoffer" object="this.object" tradeoffer="$wantedoffer" amount="$amount" immediate="false"/>
+											<do_if value="$enablelogbook">
+												<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$amount*$bestprice" text="{8834271,300}.[$amount,$ware,$bestseller.seller,$bestprice,$amount*$bestprice,$homestation]"/>
+											</do_if>
 										</do_if>
 									</do_if>
+									<remove_value name="$foundsellers"/>
 								</do_if>
-								<remove_value name="$foundsellers"/>
-							</do_if>
-							<do_else>
-								<do_if value="$debugtrace">
-									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  Skipping remaining wares this pass - already have '+this.ship.tradeorders.count+' queued trade orders.'" output="false" append="true" chance="100"/>
-								</do_if>
-							</do_else>
+								<do_else>
+									<do_if value="$debugtrace">
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  Skipping remaining wares this pass - already have '+this.ship.tradeorders.count+' queued trade orders.'" output="false" append="true" chance="100"/>
+									</do_if>
+								</do_else>
 
-							<set_value name="$scantick" exact="$scantick+1"/>
-							<do_if value="$scantick gt $scantickrate">
-								<set_value name="$scantick" exact="0"/>
-								<wait exact="1ms"/>
-							</do_if>
-						</do_all>
+								<set_value name="$scantick" exact="$scantick+1"/>
+								<do_if value="$scantick gt $scantickrate">
+									<set_value name="$scantick" exact="0"/>
+									<wait exact="1ms"/>
+								</do_if>
+							</do_all>
+						</do_else>
 						<remove_value name="$processoffers"/>
 					</do_if>
 					<remove_value name="$homebuyoffers"/>

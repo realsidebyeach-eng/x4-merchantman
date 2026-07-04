@@ -11,6 +11,7 @@ parameters below.
 | **Home Station(s)** | station list | empty | One or more stations this ship restocks. Pick multiple to have one ship service several stations in rotation. |
 | **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage, and (in Priority mode) the order to buy them in. **Leave empty to auto-manage every ware the station currently wants to buy** — see below. If you list specific wares, only those are ever bought, even if the station is short on something else. |
 | **Balanced Mode** | on/off | off | Off = **Priority mode**. On = **Balanced mode**. See below. |
+| **Fill Cargo Before Returning** | on/off | on | On = buy from every wanted ware first, tracking remaining cargo space and credits as it goes, then deliver everything home in one trip once the hold is full or nothing more is available/affordable. Off = classic mode, buy and immediately deliver one ware at a time. See below. |
 | **Max Jump Range** | 0–10 | 3 | How many jumps from a home station's own sector to search for a seller. 0 = the home station's own sector only. |
 | **Price Cap Mode** | on/off | on | On = cap is a **percentage below the home station's own price** for that ware (per-ware, automatic). Off = cap is one **flat absolute price** applied to every ware on the list. |
 | **Absolute Max Price** | 0–1,000,000 | 10,000 | Used only when Price Cap Mode is **off**. Same ceiling for every ware. |
@@ -52,6 +53,33 @@ doesn't crowd out the others. Over several passes the delivered quantities
 stay approximately even across the list. Use this for a general-purpose
 input hauler feeding several inputs a production module needs in parallel
 (e.g. Energy Cells, Ore, and Silicon all needed together for a Refinery).
+
+## Fill Cargo Before Returning vs. classic mode
+
+**Fill Cargo Before Returning** (default, on): each pass, the ship buys from
+every wanted ware it can find a valid deal for — tracking a running "how
+much cargo space is left" and "how many credits are left" as it goes — and
+only queues the delivery-to-home trade orders at the very end, once the
+hold is as full as it's going to get this pass. It only "returns short"
+(delivers less than a full hold) when there genuinely isn't enough
+available: no more wares have a seller under the price ceiling, the credit
+budget runs out, or the hold physically fills up. This means fewer separate
+round trips overall — the ship gathers several wares in one outing before
+heading home to unload, instead of shuttling back and forth for each ware
+individually.
+
+**Classic mode** (Fill Cargo Before Returning = off): the original
+behavior — for each wanted ware, buy it and immediately queue the delivery
+to home before considering the next ware. More round trips, but the home
+station starts receiving partial deliveries sooner rather than waiting for
+a full hold.
+
+In Balanced mode, Fill Cargo Before Returning also changes how the "fair
+share" cargo cap is computed: instead of a flat `hold ÷ wares wanted this
+pass`, it's `cargo space still left ÷ wares still left to consider`,
+recalculated as it goes — so earlier wares in the pass don't get an
+unfairly generous share just because later wares haven't been priced out
+yet.
 
 ## Price cap: percentage vs. absolute — which to use
 
@@ -172,7 +200,11 @@ your X4 logging configuration). Each pass logs:
   space, seller's stock, home station's demand, affordable quantity) —
   useful if a seller was picked but no trade order actually appeared;
 - a note if the ship skipped remaining wares because it already had 6
-  trade orders queued.
+  trade orders queued;
+- with Fill Cargo Before Returning on: the starting cargo space and
+  credits for the pass, and a final line once the fill pass ends showing
+  how many ware types are being delivered home in one trip and how much
+  cargo space is still free (0, if the hold filled up completely).
 
 Turn it back off once you're done — it writes on every pass for every
 ware, so leaving it on across a long play session will grow the log file

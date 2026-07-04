@@ -20,9 +20,13 @@ strategy and a price ceiling you control.
    the cheapest seller of each wanted ware.
 4. It buys in either strict top-to-bottom priority order or a balanced
    round-robin that keeps the wares roughly even.
-5. It never buys above a price ceiling you set — either a flat max price, or
+5. By default it fills its cargo hold across every wanted ware before
+   heading home, only returning short of a full hold when wares genuinely
+   aren't available — one gathering trip instead of a round trip per ware
+   (toggle this off for the classic immediate buy-then-deliver behavior).
+6. It never buys above a price ceiling you set — either a flat max price, or
    a percentage below the home station's own price for that ware.
-6. It respects your Empire > Blacklist entries — blacklisted sectors and
+7. It respects your Empire > Blacklist entries — blacklisted sectors and
    factions/objects are excluded from the search, on top of the normal
    docking/relation and "offer known to your faction" checks.
 
