@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="4">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="5">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -38,13 +38,6 @@
 				<input_param name="max" value="95"/>
 				<input_param name="step" value="1"/>
 			</param>
-			<!-- Reject a deal that's discounted by more than this - guards against implausible outlier prices. -->
-			<param name="maxpercent" default="90" type="number" text="{8834271,110}" comment="Skip deals discounted by more than this percent, used when Price Cap Mode is on.">
-				<input_param name="startvalue" value="90"/>
-				<input_param name="min" value="1"/>
-				<input_param name="max" value="99"/>
-				<input_param name="step" value="1"/>
-			</param>
 			<param name="scanspeed" default="5" type="number" text="{8834271,108}" comment="How many offer checks run before yielding a tick.">
 				<input_param name="startvalue" value="5"/>
 				<input_param name="min" value="1"/>
@@ -73,6 +66,8 @@
 		<set_order_syncpoint_reached order="this.ship.order"/>
 		<set_command command="command.searchtrades"/>
 		<set_command_action commandaction="commandaction.searchingtrades"/>
+		<!-- Resolves $blacklistgroup, used below to respect the player's Empire > Blacklist entries (blocked sectors/factions/objects) for all automated logistics. -->
+		<include_interrupt_actions ref="GetBlacklistgroup"/>
 		<!-- If we have exactly one owned home station, make it our commander so purchases draw on its own account rather than the player's global wallet. -->
 		<do_if value="$home.count == 1">
 			<do_if value="not ($home.{1} == null) and $home.{1}.owner == this.ship.owner">
@@ -88,9 +83,6 @@
 	<patch sinceversion="3">
 		<do_if value="$minpercent == null">
 			<set_value name="$minpercent" exact="20"/>
-		</do_if>
-		<do_if value="$maxpercent == null">
-			<set_value name="$maxpercent" exact="90"/>
 		</do_if>
 	</patch>
 	<patch sinceversion="4">
@@ -108,7 +100,7 @@
 			<set_command command="command.searchtrades"/>
 			<set_command_action commandaction="commandaction.searchingtrades"/>
 
-			<!-- Rebuild the jump-range search space from every home station's sector each pass, so a live edit to Max Jump Range takes effect on the next cycle. We don't pre-filter by sector ownership here - contested/pirate-owned sectors can still contain stations you have real docking rights at, so that's left entirely to the per-station match_relation_to check below. -->
+			<!-- Rebuild the jump-range search space from every home station's sector each pass, so a live edit to Max Jump Range takes effect on the next cycle. We don't pre-filter by sector ownership here - contested/pirate-owned sectors can still contain stations you have real docking rights at, so that's left entirely to the per-station match_relation_to check below. Sectors the player has explicitly blacklisted (Empire > Blacklist) for travel or activity are excluded. -->
 			<create_list name="$searchspaces"/>
 			<do_all exact="$home.count" counter="$h">
 				<set_value name="$homestation" exact="$home.{$h}"/>
@@ -125,8 +117,10 @@
 						<find_sector name="$secs" space="$clusterkeys.{$c}" multiple="true"/>
 						<do_all exact="$secs.count" counter="$s">
 							<set_value name="$sec" exact="$secs.{$s}"/>
-							<do_if value="not $searchspaces.indexof.{$sec}">
-								<append_to_list name="$searchspaces" exact="$sec"/>
+							<do_if value="not ($sec.isblacklisted.{blacklisttype.sectortravel}.{$blacklistgroup}.{this.ship}) and not ($sec.isblacklisted.{blacklisttype.sectoractivity}.{$blacklistgroup}.{this.ship})">
+								<do_if value="not $searchspaces.indexof.{$sec}">
+									<append_to_list name="$searchspaces" exact="$sec"/>
+								</do_if>
 							</do_if>
 						</do_all>
 						<remove_value name="$secs"/>
@@ -186,9 +180,8 @@
 								<set_value name="$wantedoffer" exact="$processoffers.{$w}"/>
 								<set_value name="$ware" exact="$wantedoffer.ware"/>
 
-								<!-- Work out this ware's acceptable price band. $priceceiling: reject anything pricier (not discounted enough to be worth the trip). $pricefloor: reject anything cheaper (implausible outlier). -->
+								<!-- Work out this ware's price ceiling: reject anything pricier (not discounted enough to be worth the trip). -->
 								<set_value name="$priceceiling" exact="$maxprice"/>
-								<set_value name="$pricefloor" exact="0"/>
 								<do_if value="$usepercentcap">
 									<find_sell_offer seller="$homestation" result="$homesell" wares="$ware" multiple="true"/>
 									<do_if value="$homesell.count gt 0">
@@ -199,11 +192,10 @@
 										<set_value name="$refprice" exact="$wantedoffer.unitprice/100"/>
 									</do_else>
 									<set_value name="$priceceiling" exact="$refprice*(100-$minpercent)/100"/>
-									<set_value name="$pricefloor" exact="$refprice*(100-$maxpercent)/100"/>
 									<remove_value name="$homesell"/>
 								</do_if>
 								<do_if value="$debugtrace">
-									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': refprice='+$refprice+' band=['+$pricefloor+','+$priceceiling+']'" output="false" append="true" chance="100"/>
+									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': refprice='+$refprice+' priceceiling='+$priceceiling" output="false" append="true" chance="100"/>
 								</do_if>
 
 								<!-- Search every sector in range for accessible sellers of this ware. -->
@@ -212,6 +204,7 @@
 									<find_sell_offer tradepartner="this.ship" space="$searchspaces.{$sp}" result="$sellers" wares="$ware" multiple="true">
 										<match_seller tradesknownto="this.owner">
 											<match_relation_to object="this.ship" relation="dock" comparison="ge"/>
+											<match_use_blacklist group="$blacklistgroup" type="blacklisttype.objectactivity" object="this.ship"/>
 										</match_seller>
 									</find_sell_offer>
 									<do_all exact="$sellers.count" counter="$se">
@@ -227,7 +220,7 @@
 									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': '+$foundsellers.count+' accessible seller(s) found across '+$searchspaces.count+' sector(s).'" output="false" append="true" chance="100"/>
 								</do_if>
 
-								<!-- Pick the cheapest offer within the acceptable band [$pricefloor, $priceceiling], excluding the home station selling to itself. -->
+								<!-- Pick the cheapest offer at or below the price ceiling, excluding the home station selling to itself. -->
 								<set_value name="$bestseller" exact="0"/>
 								<set_value name="$bestprice" exact="$priceceiling"/>
 								<set_value name="$cheapestseen" exact="0"/>
@@ -238,7 +231,7 @@
 										<do_if value="$debugtrace and (($cheapestseen == 0) or ($candprice lt $cheapestseen))">
 											<set_value name="$cheapestseen" exact="$candprice"/>
 										</do_if>
-										<do_if value="($candprice le $bestprice) and ($candprice ge $pricefloor)">
+										<do_if value="$candprice le $bestprice">
 											<set_value name="$bestseller" exact="$candoffer"/>
 											<set_value name="$bestprice" exact="$candprice"/>
 										</do_if>
@@ -249,7 +242,7 @@
 										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': picked '+$bestseller.seller.knownname+' at '+$bestprice+'cr/unit.'" output="false" append="true" chance="100"/>
 									</do_if>
 									<do_else>
-										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': no seller in band. Cheapest seen was '+$cheapestseen+'cr/unit (band was ['+$pricefloor+','+$priceceiling+']).'" output="false" append="true" chance="100"/>
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': no seller under ceiling. Cheapest seen was '+$cheapestseen+'cr/unit (ceiling was '+$priceceiling+').'" output="false" append="true" chance="100"/>
 									</do_else>
 								</do_if>
 

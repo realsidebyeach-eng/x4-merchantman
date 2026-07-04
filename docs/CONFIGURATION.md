@@ -15,7 +15,6 @@ parameters below.
 | **Price Cap Mode** | on/off | on | On = cap is a **percentage below the home station's own price** for that ware (per-ware, automatic). Off = cap is one **flat absolute price** applied to every ware on the list. |
 | **Absolute Max Price** | 0–1,000,000 | 10,000 | Used only when Price Cap Mode is **off**. Same ceiling for every ware. |
 | **Min Discount %** | 0–95 | 20 | Used only when Price Cap Mode is **on**. Skips a deal entirely if it isn't at least this much cheaper than the home station's own price — filters out barely-better deals that aren't worth the trip. |
-| **Max Discount %** | 1–99 | 90 | Used only when Price Cap Mode is **on**. Skips a deal if it's discounted by *more* than this — a sanity guard against implausible outlier prices. Must be greater than Min Discount % or nothing will ever qualify. |
 | **Scan Performance** | 1–15 | 5 | How many offer checks run per simulation tick before yielding. Lower this if you assign the order to many ships simultaneously and notice stutter; raise it for faster reactions on a lightly-loaded save. |
 | **Enable Logbook Entries** | on/off | on | Writes a Logbook entry (Menu → Logbook) for every completed delivery: ware, amount, seller, price, total cost, and home station, with a "show on map" link. Turn off if you're running many traders and don't want the Logbook flooded. |
 | **Enable Debug Log** | on/off | off | Writes a detailed trace to a log file every pass — see [Debugging](#debugging) below. Leave off during normal play; turn on only while troubleshooting a specific ship. |
@@ -41,19 +40,22 @@ input hauler feeding several inputs a production module needs in parallel
 
 - **Percentage mode (default, recommended)**: scales automatically per
   ware, since it's computed off of that ware's own price at the home
-  station. Min Discount % and Max Discount % together define an acceptable
-  price *band*: `home price × (1 − Max%)` ≤ accepted price ≤
-  `home price × (1 − Min%)`. Concretely, with the defaults (Min 20%, Max
-  90%): a deal must be at least 20% cheaper than the home station's own
-  price to be worth the trip, but if something is priced more than 90%
-  below — implausibly cheap — it's skipped as a likely outlier rather than
-  snapped up.
-- **Absolute mode**: one flat number for the whole list, with no lower
-  bound. Useful if your Ware Priority List only contains wares of similar
-  value (e.g. all raw minerals), or if you deliberately want a hard credit
-  ceiling regardless of economy fluctuation. Not useful if your list mixes
-  cheap and expensive wares — a cap generous enough for Hull Parts will be
-  far too generous for Energy Cells.
+  station. Min Discount % sets the price ceiling: `accepted price ≤ home
+  price × (1 − Min%)`. Concretely, with the default (Min 20%): a deal must
+  be at least 20% cheaper than the home station's own price to be worth
+  the trip.
+- **Absolute mode**: one flat number for the whole list. Useful if your
+  Ware Priority List only contains wares of similar value (e.g. all raw
+  minerals), or if you deliberately want a hard credit ceiling regardless
+  of economy fluctuation. Not useful if your list mixes cheap and
+  expensive wares — a cap generous enough for Hull Parts will be far too
+  generous for Energy Cells.
+
+There was previously also a Max Discount % upper guard (rejecting deals
+discounted by *more* than some percent, as a sanity check against
+implausible outlier prices). It's been removed for now at the point of a
+live troubleshooting session — it's straightforward to reintroduce if it
+turns out to be needed later.
 
 There is no per-ware absolute price table (see the Known Limitations note
 in the main README) — this is the one place the two modes genuinely
@@ -66,7 +68,7 @@ diverge in capability, not just in formula.
 - Ware Priority List: `Ore`, `Silicon Wafers`, `Energy Cells`
 - Balanced Mode: off
 - Max Jump Range: `2`
-- Price Cap Mode: on, Min Discount %: `10`, Max Discount %: `90`
+- Price Cap Mode: on, Min Discount %: `10`
 
 Ship will fully restock Ore first, every pass, before ever touching
 Silicon Wafers or Energy Cells, only taking deals priced at least 10%
@@ -96,11 +98,12 @@ station currently wants, never paying more than 50cr/unit for any of them.
   matches what you intended — list order is read top to bottom exactly as
   displayed.
 - **Ship won't take a deal you can see in the map/economy view**: the seller
-  may not pass the access check (`match_relation_to relation="dock"`) — your
-  faction needs actual docking/trade rights there, not just knowledge that
-  the offer exists. Also check the price against your cap; a deal that
-  looks cheap in absolute terms can still be above a tight percent-below-
-  home-price cap if the home station's own price for that ware is low.
+  may not pass the access check (`match_relation_to relation="dock"`), the
+  offer may not be "known" to your faction yet (needs prior scouting), or
+  the sector/faction may be on your Empire > Blacklist. Also check the
+  price against your cap; a deal that looks cheap in absolute terms can
+  still be above a tight Min Discount % cap if the home station's own
+  price for that ware is low.
 - **No trade orders queue up even though a valid deal was found**: the ship
   caps itself at 6 simultaneous queued trade orders at a time (to avoid
   runaway queuing); wait for existing orders to clear.
@@ -108,7 +111,7 @@ station currently wants, never paying more than 50cr/unit for any of them.
   explains it**: turn on Enable Debug Log and read the trace (see below) —
   it tells you exactly how many sectors were searched, how many sellers
   were found for that ware, and either the seller it picked or the
-  cheapest price it saw that still fell outside the accepted band.
+  cheapest price it saw that still came in above the ceiling.
 
 ## Debugging
 
@@ -121,8 +124,9 @@ your X4 logging configuration). Each pass logs:
 
 - how many of the home station's buy offers matched your Ware Priority
   List;
-- which sectors were included in the search this pass;
-- per ware: the computed price band, how many accessible sellers were
+- which sectors were included in the search this pass (after excluding any
+  blacklisted sectors);
+- per ware: the computed price ceiling, how many accessible sellers were
   found, and either which one was picked (and at what price) or the
   cheapest price seen if nothing qualified;
 - the final purchase amount and the four numbers it was capped by (cargo

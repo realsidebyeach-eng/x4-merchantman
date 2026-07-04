@@ -20,6 +20,9 @@ strategy and a price ceiling you control.
    round-robin that keeps the wares roughly even.
 5. It never buys above a price ceiling you set — either a flat max price, or
    a percentage below the home station's own price for that ware.
+6. It respects your Empire > Blacklist entries — blacklisted sectors and
+   factions/objects are excluded from the search, on top of the normal
+   docking/relation and "offer known to your faction" checks.
 
 ## Known limitations (by design, not oversights)
 
@@ -28,8 +31,6 @@ strategy and a price ceiling you control.
   parameter UI doesn't support a "table of ware → number" widget. Use
   **Price Cap Mode = on** (percent below home price) for genuine per-ware
   differentiation instead.
-- Fleet-wide "avoid this sector/faction" blacklists (the vanilla Fleet
-  Logistics feature) aren't consulted — only live relation/access checks.
 - Station build-storage restocking (a separate buyer object some stations
   have) isn't included; only the station's own regular buy offers are read.
 
