@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<content id="sbe_station_trader" name="Station Trader Assignments" description="Assigns a ship to restock one or more home stations by buying the wares they want from the cheapest accessible source in range." author="sidebyeach" version="1" date="2026-07-04" save="0">
+	<text language="44" name="Station Trader Assignments" description="Assigns a ship to restock one or more home stations by buying the wares they want from the cheapest accessible source in range."/>
+	<text language="7" name="Station Trader Assignments" description="Assigns a ship to restock one or more home stations by buying the wares they want from the cheapest accessible source in range."/>
+</content>

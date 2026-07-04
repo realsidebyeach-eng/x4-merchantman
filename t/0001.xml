@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<language id="44">
+	<page id="8834271" title="Station Trader Assignments" descr="Text for the Station Trader order" voice="no">
+		<t id="101">Home Station(s)</t>
+		<t id="102">Ware Priority List (top = highest priority)</t>
+		<t id="103">Balanced Mode (spread purchases evenly instead of top-to-bottom priority)</t>
+		<t id="104">Max Jump Range (sectors from home)</t>
+		<t id="105">Price Cap Mode: on = %% below home sell price, off = absolute max price</t>
+		<t id="106">Absolute Max Price per Unit (used when Price Cap Mode is off)</t>
+		<t id="107">Max Discount %% Below Home Sell Price (used when Price Cap Mode is on)</t>
+		<t id="108">Scan Performance (higher = smoother but slower reactions)</t>
+		<t id="500">Station Trader</t>
+		<t id="501">Restocks the assigned home station(s) by buying their wanted wares from the cheapest accessible seller within range.</t>
+	</page>
+</language>

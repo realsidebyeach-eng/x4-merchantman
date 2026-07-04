@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Station Trader Assignments, by sidebyeach. -->
+<!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="1">
+	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
+		<params>
+			<!-- One or more stations this ship restocks. -->
+			<param name="home" default="[]" type="list" text="{8834271,101}" comment="Home station(s) to restock.">
+				<input_param name="type" value="'object'"/>
+				<input_param name="class" value="[class.station]"/>
+			</param>
+			<!-- The wares this ship is allowed to manage, in priority order (top = highest priority). -->
+			<param name="wareprio" default="[]" type="list" text="{8834271,102}" comment="Wares to manage, top to bottom priority.">
+				<input_param name="type" value="'ware'"/>
+				<input_param name="cancarry" value="this.ship"/>
+			</param>
+			<!-- Priority (false) fills the top ware fully before moving to the next. Balanced (true) gives every wanted ware a fair cargo share each pass. -->
+			<param name="balanced" default="false" type="bool" text="{8834271,103}" comment="Spread purchases evenly across wares instead of strict priority."/>
+			<!-- How many jumps from a home station's own sector we are willing to search for a cheap seller. -->
+			<param name="maxjumps" default="3" type="number" text="{8834271,104}" comment="Max jump range from home.">
+				<input_param name="startvalue" value="3"/>
+				<input_param name="min" value="0"/>
+				<input_param name="max" value="10"/>
+				<input_param name="step" value="1"/>
+			</param>
+			<!-- true: price cap = X% below the home station's own sell price for that ware. false: price cap = flat MaxPrice for every ware. -->
+			<param name="usepercentcap" default="true" type="bool" text="{8834271,105}" comment="Use percent-below-home-sell-price cap instead of a flat max price."/>
+			<param name="maxprice" default="10000" type="number" text="{8834271,106}" comment="Flat max price per unit, used when Price Cap Mode is off.">
+				<input_param name="startvalue" value="10000"/>
+				<input_param name="min" value="0"/>
+				<input_param name="max" value="1000000"/>
+				<input_param name="step" value="100"/>
+			</param>
+			<param name="discountpercent" default="20" type="number" text="{8834271,107}" comment="Max price = home sell price minus this percent, used when Price Cap Mode is on.">
+				<input_param name="startvalue" value="20"/>
+				<input_param name="min" value="0"/>
+				<input_param name="max" value="95"/>
+				<input_param name="step" value="1"/>
+			</param>
+			<param name="scanspeed" default="5" type="number" text="{8834271,108}" comment="How many offer checks run before yielding a tick.">
+				<input_param name="startvalue" value="5"/>
+				<input_param name="min" value="1"/>
+				<input_param name="max" value="15"/>
+				<input_param name="step" value="1"/>
+			</param>
+		</params>
+		<skill min="15"/>
+		<requires>
+			<match shiptype="shiptype.lasertower" negate="true"/>
+		</requires>
+	</order>
+	<interrupts>
+		<handler ref="SectorChangeHandler"/>
+		<handler ref="AttackHandler"/>
+		<handler ref="MissileLockHandler"/>
+		<handler ref="ScannedHandler"/>
+		<handler ref="InspectedHandler"/>
+		<handler ref="ResupplyHandler"/>
+		<handler ref="TargetInvalidHandler"/>
+		<handler ref="TideHandler"/>
+	</interrupts>
+	<init>
+		<set_order_syncpoint_reached order="this.ship.order"/>
+		<set_command command="command.searchtrades"/>
+		<set_command_action commandaction="commandaction.searchingtrades"/>
+		<!-- If we have exactly one owned home station, make it our commander so purchases draw on its own account rather than the player's global wallet. -->
+		<do_if value="$home.count == 1">
+			<do_if value="not ($home.{0} == null) and $home.{0}.owner == this.ship.owner">
+				<set_object_commander object="this.ship" commander="$home.{0}"/>
+			</do_if>
+		</do_if>
+	</init>
+	<attention min="unknown">
+		<actions>
+			<label name="verystart"/>
+			<set_value name="$scantick" exact="0"/>
+			<set_value name="$scantickrate" exact="$scanspeed"/>
+
+			<label name="mainloop"/>
+			<set_command command="command.searchtrades"/>
+			<set_command_action commandaction="commandaction.searchingtrades"/>
+
+			<!-- Rebuild the jump-range search space from every home station's sector each pass, so a live edit to Max Jump Range takes effect on the next cycle. Hostile-owned sectors are excluded as unreachable/unsafe. -->
+			<create_list name="$searchspaces"/>
+			<do_all exact="$home.count" counter="$h">
+				<set_value name="$homestation" exact="$home.{$h}"/>
+				<do_if value="not ($homestation == null)">
+					<set_value name="$range" exact="$homestation.sector"/>
+					<do_if value="not $searchspaces.indexof.{$range}">
+						<append_to_list name="$searchspaces" exact="$range"/>
+					</do_if>
+					<create_list name="$clustertable"/>
+					<find_cluster_in_range distances="$clustertable" multiple="true" object="$range" mindistance="0" maxdistance="$maxjumps"/>
+					<set_value name="$clusterkeys" exact="$clustertable.keys.sorted"/>
+					<do_all exact="$clusterkeys.count" counter="$c">
+						<create_list name="$secs"/>
+						<find_sector name="$secs" space="$clusterkeys.{$c}" multiple="true"/>
+						<do_all exact="$secs.count" counter="$s">
+							<set_value name="$sec" exact="$secs.{$s}"/>
+							<do_if value="faction.player.relationto.{$sec.trueowner} gt -0.32">
+								<do_if value="not $searchspaces.indexof.{$sec}">
+									<append_to_list name="$searchspaces" exact="$sec"/>
+								</do_if>
+							</do_if>
+						</do_all>
+						<remove_value name="$secs"/>
+						<set_value name="$scantick" exact="$scantick+1"/>
+						<do_if value="$scantick gt $scantickrate">
+							<set_value name="$scantick" exact="0"/>
+							<wait exact="1ms"/>
+						</do_if>
+					</do_all>
+					<remove_value name="$clustertable"/>
+					<remove_value name="$clusterkeys"/>
+				</do_if>
+			</do_all>
+
+			<!-- Process every assigned home station in turn. -->
+			<do_all exact="$home.count" counter="$h2">
+				<set_value name="$homestation" exact="$home.{$h2}"/>
+				<do_if value="not ($homestation == null)">
+
+					<!-- What does this station currently want to buy, restricted to wares the player put on the priority list? -->
+					<create_list name="$wantedoffers"/>
+					<find_buy_offer buyer="$homestation" result="$homebuyoffers" multiple="true"/>
+					<do_all exact="$homebuyoffers.count" counter="$o">
+						<set_value name="$candidate" exact="$homebuyoffers.{$o}"/>
+						<do_if value="$wareprio.indexof.{$candidate.ware}">
+							<append_to_list name="$wantedoffers" exact="$candidate"/>
+						</do_if>
+					</do_all>
+
+					<do_if value="$wantedoffers.count gt 0">
+
+						<do_if value="not $balanced">
+							<!-- Priority mode: re-order the wanted offers to match the player's top-to-bottom ware list. -->
+							<create_list name="$processoffers"/>
+							<do_all exact="$wareprio.count" counter="$p">
+								<set_value name="$priow" exact="$wareprio.{$p}"/>
+								<do_all exact="$wantedoffers.count" counter="$o2">
+									<do_if value="$wantedoffers.{$o2}.ware == $priow">
+										<append_to_list name="$processoffers" exact="$wantedoffers.{$o2}"/>
+									</do_if>
+								</do_all>
+							</do_all>
+						</do_if>
+						<do_else>
+							<!-- Balanced mode: keep the station's own order; each ware below gets an equal cargo-share cap instead of first-come-first-served. -->
+							<set_value name="$processoffers" exact="$wantedoffers"/>
+						</do_else>
+
+						<do_all exact="$processoffers.count" counter="$w">
+							<do_if value="this.ship.tradeorders.count lt 6">
+								<set_value name="$wantedoffer" exact="$processoffers.{$w}"/>
+								<set_value name="$ware" exact="$wantedoffer.ware"/>
+
+								<!-- Work out this ware's price ceiling. -->
+								<set_value name="$capprice" exact="$maxprice"/>
+								<do_if value="$usepercentcap">
+									<find_sell_offer seller="$homestation" result="$homesell" wares="$ware" multiple="true"/>
+									<do_if value="$homesell.count gt 0">
+										<set_value name="$refprice" exact="$homesell.{0}.unitprice/100"/>
+									</do_if>
+									<do_else>
+										<!-- Home station has no active sell offer for this ware right now; fall back to what it is currently offering to pay for it. -->
+										<set_value name="$refprice" exact="$wantedoffer.unitprice/100"/>
+									</do_else>
+									<set_value name="$capprice" exact="$refprice*(100-$discountpercent)/100"/>
+									<remove_value name="$homesell"/>
+								</do_if>
+
+								<!-- Search every sector in range for accessible sellers of this ware. -->
+								<create_list name="$foundsellers"/>
+								<do_all exact="$searchspaces.count" counter="$sp">
+									<find_sell_offer tradepartner="this.ship" space="$searchspaces.{$sp}" result="$sellers" wares="$ware" multiple="true">
+										<match_seller tradesknownto="this.owner">
+											<match_relation_to object="this.ship" relation="dock" comparison="ge"/>
+										</match_seller>
+									</find_sell_offer>
+									<do_all exact="$sellers.count" counter="$se">
+										<append_to_list name="$foundsellers" exact="$sellers.{$se}"/>
+									</do_all>
+									<set_value name="$scantick" exact="$scantick+1"/>
+									<do_if value="$scantick gt $scantickrate">
+										<set_value name="$scantick" exact="0"/>
+										<wait exact="1ms"/>
+									</do_if>
+								</do_all>
+
+								<!-- Pick the cheapest offer at or below the price cap, excluding the home station selling to itself. -->
+								<set_value name="$bestseller" exact="0"/>
+								<set_value name="$bestprice" exact="$capprice"/>
+								<do_all exact="$foundsellers.count" counter="$fs">
+									<set_value name="$candoffer" exact="$foundsellers.{$fs}"/>
+									<do_if value="not ($candoffer.seller == $homestation)">
+										<set_value name="$candprice" exact="$candoffer.unitprice/100"/>
+										<do_if value="$candprice le $bestprice">
+											<set_value name="$bestseller" exact="$candoffer"/>
+											<set_value name="$bestprice" exact="$candprice"/>
+										</do_if>
+									</do_if>
+								</do_all>
+
+								<do_if value="not ($bestseller == 0)">
+									<set_value name="$spendablemoney" exact="player.money/100"/>
+									<do_if value="this.ship.commander">
+										<do_if value="this.ship.commander.hasownaccount and this.ship.commander.money gt 0">
+											<set_value name="$spendablemoney" exact="this.ship.commander.money/100"/>
+										</do_if>
+									</do_if>
+
+									<set_value name="$cargocap" exact="this.ship.cargo.{$ware}.free"/>
+									<do_if value="$balanced">
+										<!-- Fair-share cap: don't let one ware use the whole hold this pass. -->
+										<set_value name="$cargocap" exact="[$cargocap/$processoffers.count,1].max"/>
+									</do_if>
+
+									<set_value name="$amount" exact="[$cargocap,$bestseller.amount,$wantedoffer.amount,$spendablemoney/(2*$bestprice)].min"/>
+
+									<do_if value="$amount gt 0">
+										<!-- Buy leg: purchase from the cheapest accessible seller. -->
+										<create_trade_order name="$bestseller" object="this.object" tradeoffer="$bestseller" amount="$amount" immediate="false"/>
+										<!-- Sell leg: deliver straight into the home station's own buy offer. -->
+										<create_trade_order name="$wantedoffer" object="this.object" tradeoffer="$wantedoffer" amount="$amount" immediate="false"/>
+									</do_if>
+								</do_if>
+								<remove_value name="$foundsellers"/>
+							</do_if>
+
+							<set_value name="$scantick" exact="$scantick+1"/>
+							<do_if value="$scantick gt $scantickrate">
+								<set_value name="$scantick" exact="0"/>
+								<wait exact="1ms"/>
+							</do_if>
+						</do_all>
+						<remove_value name="$processoffers"/>
+					</do_if>
+					<remove_value name="$homebuyoffers"/>
+					<remove_value name="$wantedoffers"/>
+				</do_if>
+			</do_all>
+
+			<wait min="10s" max="20s"/>
+			<resume label="mainloop"/>
+		</actions>
+	</attention>
+</aiscript>

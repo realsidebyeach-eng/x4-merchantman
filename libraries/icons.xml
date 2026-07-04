@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<icons xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="icons.xsd">
+	<icon name="order_sbestationtrader" texture="assets\fx\gui\textures\order\order_traderoutine.tga" height="32" width="32"/>
+</icons>
