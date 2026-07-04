@@ -74,8 +74,8 @@
 		<set_command_action commandaction="commandaction.searchingtrades"/>
 		<!-- If we have exactly one owned home station, make it our commander so purchases draw on its own account rather than the player's global wallet. -->
 		<do_if value="$home.count == 1">
-			<do_if value="not ($home.{0} == null) and $home.{0}.owner == this.ship.owner">
-				<set_object_commander object="this.ship" commander="$home.{0}"/>
+			<do_if value="not ($home.{1} == null) and $home.{1}.owner == this.ship.owner">
+				<set_object_commander object="this.ship" commander="$home.{1}"/>
 			</do_if>
 		</do_if>
 	</init>
@@ -182,7 +182,7 @@
 								<do_if value="$usepercentcap">
 									<find_sell_offer seller="$homestation" result="$homesell" wares="$ware" multiple="true"/>
 									<do_if value="$homesell.count gt 0">
-										<set_value name="$refprice" exact="$homesell.{0}.unitprice/100"/>
+										<set_value name="$refprice" exact="$homesell.{1}.unitprice/100"/>
 									</do_if>
 									<do_else>
 										<!-- Home station has no active sell offer for this ware right now; fall back to what it is currently offering to pay for it. -->
