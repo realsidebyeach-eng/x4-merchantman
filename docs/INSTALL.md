@@ -7,7 +7,7 @@ the entire project folder there and rename it:
 
 | OS | Extensions path |
 |---|---|
-| Linux (native Steam build) | `~/.config/EgoSoft/X4/extensions/sbe_station_trader/` |
+| Linux (native Steam build) | `<Steam library>/steamapps/common/X4 Foundations/extensions/sbe_station_trader/` |
 | Windows | `%USERPROFILE%\Documents\Egosoft\X4\extensions\sbe_station_trader\` |
 | Steam Deck / Proton | `<compatdata>/pfx/drive_c/users/steamuser/Documents/Egosoft/X4/extensions/sbe_station_trader/` |
 
@@ -23,18 +23,27 @@ extensions/
     t/0001.xml
 ```
 
-On this machine the mod is already installed at
-`~/.config/EgoSoft/X4/extensions/sbe_station_trader/` — a straight copy of
-this repo's contents (minus `docs/`, `.git/`, `README.md`, which the game
-doesn't need). If you edit the source in this repo, re-copy the four
-game-relevant files/folders (`content.xml`, `aiscripts/`, `libraries/`,
-`t/`) over the installed copy to pick up changes:
+On this machine the game is installed via Steam at
+`~/.local/share/Steam/steamapps/common/X4 Foundations/`, and that's where
+other installed extensions (DLCs, `tatertrader`, etc.) already live — so the
+mod is installed there too, at
+`~/.local/share/Steam/steamapps/common/X4 Foundations/extensions/sbe_station_trader/`,
+a straight copy of this repo's contents (minus `.git/`, which the game
+doesn't need). If you edit the source in this repo, re-copy it over the
+installed copy to pick up changes:
 
 ```bash
-rsync -a --delete \
-  --exclude docs --exclude .git --exclude README.md --exclude '*.md' \
-  ~/Projects/X4StationTrader/ ~/.config/EgoSoft/X4/extensions/sbe_station_trader/
+rsync -a --delete --exclude '.git' \
+  ~/Projects/X4StationTrader/ \
+  "~/.local/share/Steam/steamapps/common/X4 Foundations/extensions/sbe_station_trader/"
 ```
+
+There is also a user-level extensions folder at
+`~/.config/EgoSoft/X4/extensions/` that X4 scans in addition to the game
+install directory — some modders prefer it because it isn't touched by
+Steam's "verify integrity of game files." Only install the mod in **one**
+of the two locations at a time; having the same content id (`sbe_station_trader`)
+in both will make X4's extension manager report a duplicate-id conflict.
 
 ## 2. Enable it in-game
 
