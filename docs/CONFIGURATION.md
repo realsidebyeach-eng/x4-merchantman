@@ -144,6 +144,15 @@ station currently wants, never paying more than 50cr/unit for any of them.
 
 ## Troubleshooting
 
+- **Logbook entries show "from null" and a station shows as a hex ID
+  (e.g. `0x74572`) instead of its name**: this was a bug in versions up to
+  8. The seller was being read from the trade offer *after* it had already
+  been consumed by `create_trade_order`, which invalidates that reference,
+  and station objects don't auto-render a friendly name in Logbook text
+  the way ware names do. Fixed in version 9 by capturing the seller's name
+  as a string before the offer is used, and by explicitly using
+  `.knownname` for every station reference in Logbook text. Only affects
+  the Logbook display text — the actual trades themselves were unaffected.
 - **Ship shows up in the home station's Defence subordinate group**: this
   was a bug in versions up to 5 — assigning a single owned home station
   made the ship that station's commander-subordinate to draw purchase
