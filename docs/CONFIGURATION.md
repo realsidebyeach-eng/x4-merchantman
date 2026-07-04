@@ -14,7 +14,8 @@ parameters below.
 | **Max Jump Range** | 0–10 | 3 | How many jumps from a home station's own sector to search for a seller. 0 = the home station's own sector only. |
 | **Price Cap Mode** | on/off | on | On = cap is a **percentage below the home station's own price** for that ware (per-ware, automatic). Off = cap is one **flat absolute price** applied to every ware on the list. |
 | **Absolute Max Price** | 0–1,000,000 | 10,000 | Used only when Price Cap Mode is **off**. Same ceiling for every ware. |
-| **Max Discount %** | 0–95 | 20 | Used only when Price Cap Mode is **on**. Won't buy a ware for more than `(home station's price for that ware) × (1 − this% )`. |
+| **Min Discount %** | 0–95 | 20 | Used only when Price Cap Mode is **on**. Skips a deal entirely if it isn't at least this much cheaper than the home station's own price — filters out barely-better deals that aren't worth the trip. |
+| **Max Discount %** | 1–99 | 90 | Used only when Price Cap Mode is **on**. Skips a deal if it's discounted by *more* than this — a sanity guard against implausible outlier prices. Must be greater than Min Discount % or nothing will ever qualify. |
 | **Scan Performance** | 1–15 | 5 | How many offer checks run per simulation tick before yielding. Lower this if you assign the order to many ships simultaneously and notice stutter; raise it for faster reactions on a lightly-loaded save. |
 | **Enable Logbook Entries** | on/off | on | Writes a Logbook entry (Menu → Logbook) for every completed delivery: ware, amount, seller, price, total cost, and home station, with a "show on map" link. Turn off if you're running many traders and don't want the Logbook flooded. |
 
@@ -39,15 +40,19 @@ input hauler feeding several inputs a production module needs in parallel
 
 - **Percentage mode (default, recommended)**: scales automatically per
   ware, since it's computed off of that ware's own price at the home
-  station. A 20% cap means "never pay more than 20% over what my station
-  itself considers a fair sell price for this," which stays sensible as
-  ware prices drift with the economy.
-- **Absolute mode**: one number for the whole list. Useful if your Ware
-  Priority List only contains wares of similar value (e.g. all raw
-  minerals), or if you deliberately want a hard credit ceiling regardless of
-  economy fluctuation. Not useful if your list mixes cheap and expensive
-  wares — a cap generous enough for Hull Parts will be far too generous for
-  Energy Cells.
+  station. Min Discount % and Max Discount % together define an acceptable
+  price *band*: `home price × (1 − Max%)` ≤ accepted price ≤
+  `home price × (1 − Min%)`. Concretely, with the defaults (Min 20%, Max
+  90%): a deal must be at least 20% cheaper than the home station's own
+  price to be worth the trip, but if something is priced more than 90%
+  below — implausibly cheap — it's skipped as a likely outlier rather than
+  snapped up.
+- **Absolute mode**: one flat number for the whole list, with no lower
+  bound. Useful if your Ware Priority List only contains wares of similar
+  value (e.g. all raw minerals), or if you deliberately want a hard credit
+  ceiling regardless of economy fluctuation. Not useful if your list mixes
+  cheap and expensive wares — a cap generous enough for Hull Parts will be
+  far too generous for Energy Cells.
 
 There is no per-ware absolute price table (see the Known Limitations note
 in the main README) — this is the one place the two modes genuinely
@@ -60,11 +65,12 @@ diverge in capability, not just in formula.
 - Ware Priority List: `Ore`, `Silicon Wafers`, `Energy Cells`
 - Balanced Mode: off
 - Max Jump Range: `2`
-- Price Cap Mode: on, Max Discount %: `15`
+- Price Cap Mode: on, Min Discount %: `10`, Max Discount %: `90`
 
 Ship will fully restock Ore first, every pass, before ever touching
-Silicon Wafers or Energy Cells, and won't pay more than 15% above the
-station's own listed price for any of them, searching up to 2 jumps out.
+Silicon Wafers or Energy Cells, only taking deals priced at least 10%
+below the station's own listed price for any of them, searching up to 2
+jumps out.
 
 **Multi-station balanced feeder**
 - Home Station(s): `Refinery One`, `Refinery Two`

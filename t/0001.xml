@@ -7,9 +7,10 @@
 		<t id="104">Max Jump Range (sectors from home)</t>
 		<t id="105">Price Cap Mode: on = %% below home sell price, off = absolute max price</t>
 		<t id="106">Absolute Max Price per Unit (used when Price Cap Mode is off)</t>
-		<t id="107">Max Discount %% Below Home Sell Price (used when Price Cap Mode is on)</t>
+		<t id="107">Min Discount %% Below Home Sell Price - skip deals not at least this much cheaper (used when Price Cap Mode is on)</t>
 		<t id="108">Scan Performance (higher = smoother but slower reactions)</t>
 		<t id="109">Enable Logbook Entries</t>
+		<t id="110">Max Discount %% Below Home Sell Price - skip deals discounted more than this (used when Price Cap Mode is on)</t>
 		<t id="300">Bought %1 %2 from %3 at %4cr/unit (%5cr total) to restock %6.</t>
 		<t id="500">Station Trader</t>
 		<t id="501">Restocks the assigned home station(s) by buying their wanted wares from the cheapest accessible seller within range.</t>

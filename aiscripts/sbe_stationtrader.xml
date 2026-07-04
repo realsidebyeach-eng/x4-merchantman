@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="2">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="3">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -31,10 +31,18 @@
 				<input_param name="max" value="1000000"/>
 				<input_param name="step" value="100"/>
 			</param>
-			<param name="discountpercent" default="20" type="number" text="{8834271,107}" comment="Max price = home sell price minus this percent, used when Price Cap Mode is on.">
+			<!-- Reject a deal that isn't discounted by at least this much - not worth the trip. -->
+			<param name="minpercent" default="20" type="number" text="{8834271,107}" comment="Skip deals discounted by less than this percent, used when Price Cap Mode is on.">
 				<input_param name="startvalue" value="20"/>
 				<input_param name="min" value="0"/>
 				<input_param name="max" value="95"/>
+				<input_param name="step" value="1"/>
+			</param>
+			<!-- Reject a deal that's discounted by more than this - guards against implausible outlier prices. -->
+			<param name="maxpercent" default="90" type="number" text="{8834271,110}" comment="Skip deals discounted by more than this percent, used when Price Cap Mode is on.">
+				<input_param name="startvalue" value="90"/>
+				<input_param name="min" value="1"/>
+				<input_param name="max" value="99"/>
 				<input_param name="step" value="1"/>
 			</param>
 			<param name="scanspeed" default="5" type="number" text="{8834271,108}" comment="How many offer checks run before yielding a tick.">
@@ -74,6 +82,14 @@
 	<patch sinceversion="2">
 		<do_if value="$enablelogbook == null">
 			<set_value name="$enablelogbook" exact="true"/>
+		</do_if>
+	</patch>
+	<patch sinceversion="3">
+		<do_if value="$minpercent == null">
+			<set_value name="$minpercent" exact="20"/>
+		</do_if>
+		<do_if value="$maxpercent == null">
+			<set_value name="$maxpercent" exact="90"/>
 		</do_if>
 	</patch>
 	<attention min="unknown">
@@ -160,8 +176,9 @@
 								<set_value name="$wantedoffer" exact="$processoffers.{$w}"/>
 								<set_value name="$ware" exact="$wantedoffer.ware"/>
 
-								<!-- Work out this ware's price ceiling. -->
-								<set_value name="$capprice" exact="$maxprice"/>
+								<!-- Work out this ware's acceptable price band. $priceceiling: reject anything pricier (not discounted enough to be worth the trip). $pricefloor: reject anything cheaper (implausible outlier). -->
+								<set_value name="$priceceiling" exact="$maxprice"/>
+								<set_value name="$pricefloor" exact="0"/>
 								<do_if value="$usepercentcap">
 									<find_sell_offer seller="$homestation" result="$homesell" wares="$ware" multiple="true"/>
 									<do_if value="$homesell.count gt 0">
@@ -171,7 +188,8 @@
 										<!-- Home station has no active sell offer for this ware right now; fall back to what it is currently offering to pay for it. -->
 										<set_value name="$refprice" exact="$wantedoffer.unitprice/100"/>
 									</do_else>
-									<set_value name="$capprice" exact="$refprice*(100-$discountpercent)/100"/>
+									<set_value name="$priceceiling" exact="$refprice*(100-$minpercent)/100"/>
+									<set_value name="$pricefloor" exact="$refprice*(100-$maxpercent)/100"/>
 									<remove_value name="$homesell"/>
 								</do_if>
 
@@ -193,14 +211,14 @@
 									</do_if>
 								</do_all>
 
-								<!-- Pick the cheapest offer at or below the price cap, excluding the home station selling to itself. -->
+								<!-- Pick the cheapest offer within the acceptable band [$pricefloor, $priceceiling], excluding the home station selling to itself. -->
 								<set_value name="$bestseller" exact="0"/>
-								<set_value name="$bestprice" exact="$capprice"/>
+								<set_value name="$bestprice" exact="$priceceiling"/>
 								<do_all exact="$foundsellers.count" counter="$fs">
 									<set_value name="$candoffer" exact="$foundsellers.{$fs}"/>
 									<do_if value="not ($candoffer.seller == $homestation)">
 										<set_value name="$candprice" exact="$candoffer.unitprice/100"/>
-										<do_if value="$candprice le $bestprice">
+										<do_if value="($candprice le $bestprice) and ($candprice ge $pricefloor)">
 											<set_value name="$bestseller" exact="$candoffer"/>
 											<set_value name="$bestprice" exact="$candprice"/>
 										</do_if>
