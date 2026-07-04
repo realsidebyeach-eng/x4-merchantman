@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="5">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="6">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -68,12 +68,6 @@
 		<set_command_action commandaction="commandaction.searchingtrades"/>
 		<!-- Resolves $blacklistgroup, used below to respect the player's Empire > Blacklist entries (blocked sectors/factions/objects) for all automated logistics. -->
 		<include_interrupt_actions ref="GetBlacklistgroup"/>
-		<!-- If we have exactly one owned home station, make it our commander so purchases draw on its own account rather than the player's global wallet. -->
-		<do_if value="$home.count == 1">
-			<do_if value="not ($home.{1} == null) and $home.{1}.owner == this.ship.owner">
-				<set_object_commander object="this.ship" commander="$home.{1}"/>
-			</do_if>
-		</do_if>
 	</init>
 	<patch sinceversion="2">
 		<do_if value="$enablelogbook == null">

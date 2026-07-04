@@ -88,6 +88,15 @@ station currently wants, never paying more than 50cr/unit for any of them.
 
 ## Troubleshooting
 
+- **Ship shows up in the home station's Defence subordinate group**: this
+  was a bug in versions up to 5 — assigning a single owned home station
+  made the ship that station's commander-subordinate to draw purchase
+  funds from its account, which the game defaulted into the Defence
+  role. Fixed in version 6 by dropping that commander assignment entirely
+  (purchases now always draw from the player wallet). If a ship was
+  already mis-assigned to Defence before updating, remove it from that
+  group manually in the station's subordinates panel — the fix only
+  prevents it going forward, it doesn't undo an existing assignment.
 - **Ship never buys anything**: confirm the home station actually has an
   active buy offer for at least one ware on your Ware Priority List (check
   the station's own Trade menu in-game — "buying" wares are shown there),
