@@ -13,7 +13,9 @@ strategy and a price ceiling you control.
 ## What it does
 
 1. Assign the ship to one or more home stations.
-2. It reads what each station currently wants to buy.
+2. It auto-detects what each station currently wants to buy — no manual
+   ware list required, though you can optionally provide one to restrict
+   or reorder what it manages.
 3. It searches every accessible station within a configurable jump range for
    the cheapest seller of each wanted ware.
 4. It buys in either strict top-to-bottom priority order or a balanced

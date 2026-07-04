@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="6">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="7">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -9,8 +9,8 @@
 				<input_param name="type" value="'object'"/>
 				<input_param name="class" value="[class.station]"/>
 			</param>
-			<!-- The wares this ship is allowed to manage, in priority order (top = highest priority). -->
-			<param name="wareprio" default="[]" type="list" text="{8834271,102}" comment="Wares to manage, top to bottom priority.">
+			<!-- The wares this ship is allowed to manage, in priority order (top = highest priority). Leave empty to auto-manage every ware the station currently wants to buy. -->
+			<param name="wareprio" default="[]" type="list" text="{8834271,102}" comment="Wares to manage, top to bottom priority. Leave empty to auto-manage everything the station wants.">
 				<input_param name="type" value="'ware'"/>
 				<input_param name="cancarry" value="this.ship"/>
 			</param>
@@ -137,32 +137,49 @@
 				<set_value name="$homestation" exact="$home.{$h2}"/>
 				<do_if value="not ($homestation == null)">
 
-					<!-- What does this station currently want to buy, restricted to wares the player put on the priority list? -->
+					<!-- What does this station currently want to buy? If a Ware Priority List was given, restrict to that; otherwise auto-manage everything the station wants. -->
 					<create_list name="$wantedoffers"/>
 					<find_buy_offer buyer="$homestation" result="$homebuyoffers" multiple="true"/>
-					<do_all exact="$homebuyoffers.count" counter="$o">
-						<set_value name="$candidate" exact="$homebuyoffers.{$o}"/>
-						<do_if value="$wareprio.indexof.{$candidate.ware}">
-							<append_to_list name="$wantedoffers" exact="$candidate"/>
-						</do_if>
-					</do_all>
+					<do_if value="$wareprio.count gt 0">
+						<do_all exact="$homebuyoffers.count" counter="$o">
+							<set_value name="$candidate" exact="$homebuyoffers.{$o}"/>
+							<do_if value="$wareprio.indexof.{$candidate.ware}">
+								<append_to_list name="$wantedoffers" exact="$candidate"/>
+							</do_if>
+						</do_all>
+					</do_if>
+					<do_else>
+						<append_list_elements name="$wantedoffers" other="$homebuyoffers"/>
+					</do_else>
 					<do_if value="$debugtrace">
-						<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': '+$homebuyoffers.count+' total buy offers, '+$wantedoffers.count+' match the ware priority list.'" output="false" append="true" chance="100"/>
+						<do_if value="$wareprio.count gt 0">
+							<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': '+$homebuyoffers.count+' total buy offers, '+$wantedoffers.count+' match the ware priority list.'" output="false" append="true" chance="100"/>
+						</do_if>
+						<do_else>
+							<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': '+$homebuyoffers.count+' total buy offers, auto-managing all of them (no ware priority list set).'" output="false" append="true" chance="100"/>
+						</do_else>
 					</do_if>
 
 					<do_if value="$wantedoffers.count gt 0">
 
 						<do_if value="not $balanced">
-							<!-- Priority mode: re-order the wanted offers to match the player's top-to-bottom ware list. -->
-							<create_list name="$processoffers"/>
-							<do_all exact="$wareprio.count" counter="$p">
-								<set_value name="$priow" exact="$wareprio.{$p}"/>
-								<do_all exact="$wantedoffers.count" counter="$o2">
-									<do_if value="$wantedoffers.{$o2}.ware == $priow">
-										<append_to_list name="$processoffers" exact="$wantedoffers.{$o2}"/>
-									</do_if>
+							<do_if value="$wareprio.count gt 0">
+								<!-- Priority mode with an explicit list: re-order the wanted offers to match the player's top-to-bottom ware list. -->
+								<create_list name="$processoffers"/>
+								<do_all exact="$wareprio.count" counter="$p">
+									<set_value name="$priow" exact="$wareprio.{$p}"/>
+									<do_all exact="$wantedoffers.count" counter="$o2">
+										<do_if value="$wantedoffers.{$o2}.ware == $priow">
+											<append_to_list name="$processoffers" exact="$wantedoffers.{$o2}"/>
+										</do_if>
+									</do_all>
 								</do_all>
-							</do_all>
+							</do_if>
+							<do_else>
+								<!-- Priority mode, auto-detect: no player-specified order to follow, so process the most understocked ware (lowest stocklevel) first. -->
+								<set_value name="$processoffers" exact="$wantedoffers"/>
+								<sort_list list="$processoffers" sortbyvalue="loop.element.stocklevel" sortdescending="false"/>
+							</do_else>
 						</do_if>
 						<do_else>
 							<!-- Balanced mode: keep the station's own order; each ware below gets an equal cargo-share cap instead of first-come-first-served. -->

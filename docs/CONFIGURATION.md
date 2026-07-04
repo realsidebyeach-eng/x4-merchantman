@@ -9,7 +9,7 @@ parameters below.
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
 | **Home Station(s)** | station list | empty | One or more stations this ship restocks. Pick multiple to have one ship service several stations in rotation. |
-| **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage. Wares the home station wants but that aren't on this list are **never** bought, even if the station is short on them. List order is the priority order used in Priority mode (top = first). |
+| **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage, and (in Priority mode) the order to buy them in. **Leave empty to auto-manage every ware the station currently wants to buy** — see below. If you list specific wares, only those are ever bought, even if the station is short on something else. |
 | **Balanced Mode** | on/off | off | Off = **Priority mode**. On = **Balanced mode**. See below. |
 | **Max Jump Range** | 0–10 | 3 | How many jumps from a home station's own sector to search for a seller. 0 = the home station's own sector only. |
 | **Price Cap Mode** | on/off | on | On = cap is a **percentage below the home station's own price** for that ware (per-ware, automatic). Off = cap is one **flat absolute price** applied to every ware on the list. |
@@ -19,14 +19,31 @@ parameters below.
 | **Enable Logbook Entries** | on/off | on | Writes a Logbook entry (Menu → Logbook) for every completed delivery: ware, amount, seller, price, total cost, and home station, with a "show on map" link. Turn off if you're running many traders and don't want the Logbook flooded. |
 | **Enable Debug Log** | on/off | off | Writes a detailed trace to a log file every pass — see [Debugging](#debugging) below. Leave off during normal play; turn on only while troubleshooting a specific ship. |
 
+## Auto-detect vs. an explicit ware list
+
+Leave **Ware Priority List** empty and the ship manages *every* ware the
+home station currently wants to buy — nothing to configure per-ware, it
+just reacts to whatever the station's own buy offers show at the time.
+In Priority mode with auto-detect, "top to bottom" isn't meaningful (there's
+no list to order), so the ship instead processes whichever wanted ware is
+most understocked first (lowest stock level relative to the station's
+target).
+
+List specific wares instead if you want to (a) restrict the ship to only
+some of what the station wants — e.g. a station that trades a wide basket
+but you only want this particular ship handling raw minerals — or (b) force
+a specific top-to-bottom priority order in Priority mode regardless of
+current stock levels.
+
 ## Priority mode vs. Balanced mode
 
-**Priority mode** (Balanced Mode = off): each pass, the ship walks the Ware
-Priority List top to bottom. For the first ware the station still wants, it
-spends as much cargo space and budget as that single purchase needs before
-even considering the next ware. Use this when one ware matters more than
-the others — e.g. a station that will stop production entirely without
-Ore, but can tolerate running low on Silicon Wafers for a while.
+**Priority mode** (Balanced Mode = off): each pass, the ship processes
+wanted wares one at a time — either in your Ware Priority List's order, or
+by most-understocked-first if the list is empty — spending as much cargo
+space and budget as that single purchase needs before even considering the
+next ware. Use this when one ware matters more than the others — e.g. a
+station that will stop production entirely without Ore, but can tolerate
+running low on Silicon Wafers for a while.
 
 **Balanced mode** (Balanced Mode = on): each pass, the ship still only
 considers wares the station currently wants, but caps every ware to
@@ -63,6 +80,17 @@ diverge in capability, not just in formula.
 
 ## Example recipes
 
+**Fully hands-off restocker**
+- Home Station(s): `Trade Station Alpha`
+- Ware Priority List: *(leave empty)*
+- Balanced Mode: off
+- Max Jump Range: `5`
+- Price Cap Mode: on, Min Discount %: `20`
+
+Ship auto-detects whatever the station is currently trying to buy,
+tackling the most understocked ware first each pass, without you ever
+having to name specific wares.
+
 **Single station, strict priority, tight budget**
 - Home Station(s): `Ore Mine Alpha`
 - Ware Priority List: `Ore`, `Silicon Wafers`, `Energy Cells`
@@ -98,10 +126,11 @@ station currently wants, never paying more than 50cr/unit for any of them.
   group manually in the station's subordinates panel — the fix only
   prevents it going forward, it doesn't undo an existing assignment.
 - **Ship never buys anything**: confirm the home station actually has an
-  active buy offer for at least one ware on your Ware Priority List (check
-  the station's own Trade menu in-game — "buying" wares are shown there),
-  and that Max Jump Range is wide enough to reach a seller your faction can
-  dock at.
+  active buy offer for at least one ware right now (check the station's
+  own Trade menu in-game — "buying" wares are shown there) — and, if you
+  populated Ware Priority List, that at least one of those specific wares
+  is among them. Also check Max Jump Range is wide enough to reach a
+  seller your faction can dock at.
 - **Ship buys the "wrong" ware first**: check Balanced Mode is off if you
   expect strict priority, and that the ware order in Ware Priority List
   matches what you intended — list order is read top to bottom exactly as
@@ -131,8 +160,9 @@ machine that's under `~/.config/EgoSoft/X4/` for the native Linux build,
 or your `Documents/Egosoft/X4` folder on Windows; exact subpath depends on
 your X4 logging configuration). Each pass logs:
 
-- how many of the home station's buy offers matched your Ware Priority
-  List;
+- how many of the home station's buy offers will be managed — either "all
+  of them" (auto-detect) or "N match the ware priority list" (explicit
+  list);
 - which sectors were included in the search this pass (after excluding any
   blacklisted sectors);
 - per ware: the computed price ceiling, how many accessible sellers were
