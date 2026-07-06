@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="9">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="10">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -137,6 +137,73 @@
 			</do_all>
 			<do_if value="$debugtrace">
 				<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Search spaces this pass ('+$searchspaces.count+'): '+$searchspaces" output="false" append="true" chance="100"/>
+			</do_if>
+
+			<!-- Offload any stray cargo not tied to a pending trade order - e.g. left over after a forced pirate "drop cargo" demand interrupted a delivery. Only runs when nothing is queued, so it can never conflict with cargo already committed to an in-progress delivery. Tries a home station that wants it first, then any accessible buyer, so the ship never ends up permanently stuck holding goods. -->
+			<do_if value="this.ship.tradeorders.count == 0">
+				<set_value name="$straycargo" exact="this.ship.cargo.list"/>
+				<do_all exact="$straycargo.count" counter="$sc">
+					<do_if value="this.ship.tradeorders.count lt 6">
+						<set_value name="$strayware" exact="$straycargo.{$sc}"/>
+						<set_value name="$strayamount" exact="this.ship.cargo.{$strayware}.count"/>
+						<do_if value="$strayamount gt 0">
+							<set_value name="$strayhandled" exact="false"/>
+							<!-- First choice: deliver to a home station that wants it. -->
+							<do_all exact="$home.count" counter="$sh">
+								<do_if value="not $strayhandled">
+									<set_value name="$strayhome" exact="$home.{$sh}"/>
+									<do_if value="not ($strayhome == null)">
+										<find_buy_offer tradepartner="this.ship" buyer="$strayhome" wares="$strayware" result="$strayhomeoffer"/>
+										<do_if value="$strayhomeoffer.available">
+											<create_trade_order name="$strayhomeoffer" object="this.object" tradeoffer="$strayhomeoffer" amount="[$strayamount,$strayhomeoffer.amount].min" immediate="false"/>
+											<set_value name="$strayhandled" exact="true"/>
+											<do_if value="$debugtrace">
+												<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Stray cargo: delivering '+$strayamount+' '+$strayware+' to home station '+$strayhome.knownname+'.'" output="false" append="true" chance="100"/>
+											</do_if>
+										</do_if>
+										<remove_value name="$strayhomeoffer"/>
+									</do_if>
+								</do_if>
+							</do_all>
+							<!-- No home station wants it - dump it on the best-paying accessible buyer in range instead of holding onto it forever. -->
+							<do_if value="not $strayhandled">
+								<create_list name="$straybuyers"/>
+								<do_all exact="$searchspaces.count" counter="$sp2">
+									<find_buy_offer tradepartner="this.ship" space="$searchspaces.{$sp2}" wares="$strayware" result="$strayfound" multiple="true">
+										<match_buyer tradesknownto="this.owner">
+											<match_relation_to object="this.ship" relation="dock" comparison="ge"/>
+											<match_use_blacklist group="$blacklistgroup" type="blacklisttype.objectactivity" object="this.ship"/>
+										</match_buyer>
+									</find_buy_offer>
+									<do_all exact="$strayfound.count" counter="$sf">
+										<append_to_list name="$straybuyers" exact="$strayfound.{$sf}"/>
+									</do_all>
+								</do_all>
+								<set_value name="$beststraybuyer" exact="0"/>
+								<set_value name="$beststrayprice" exact="0"/>
+								<do_all exact="$straybuyers.count" counter="$sb">
+									<set_value name="$straycand" exact="$straybuyers.{$sb}"/>
+									<set_value name="$straycandprice" exact="$straycand.unitprice/100"/>
+									<do_if value="$straycandprice gt $beststrayprice">
+										<set_value name="$beststraybuyer" exact="$straycand"/>
+										<set_value name="$beststrayprice" exact="$straycandprice"/>
+									</do_if>
+								</do_all>
+								<do_if value="not ($beststraybuyer == 0)">
+									<create_trade_order name="$beststraybuyer" object="this.object" tradeoffer="$beststraybuyer" amount="[$strayamount,$beststraybuyer.amount].min" immediate="false"/>
+									<do_if value="$debugtrace">
+										<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Stray cargo: no home station wanted '+$strayware+', selling '+$strayamount+' to '+$beststraybuyer.buyer.knownname+' at '+$beststrayprice+'cr/unit instead.'" output="false" append="true" chance="100"/>
+									</do_if>
+								</do_if>
+								<do_elseif value="$debugtrace">
+									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Stray cargo: '+$strayware+' - no home station or accessible buyer found yet, will retry next pass.'" output="false" append="true" chance="100"/>
+								</do_elseif>
+								<remove_value name="$straybuyers"/>
+							</do_if>
+						</do_if>
+					</do_if>
+				</do_all>
+				<remove_value name="$straycargo"/>
 			</do_if>
 
 			<!-- Process every assigned home station in turn. -->

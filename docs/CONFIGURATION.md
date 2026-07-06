@@ -142,6 +142,19 @@ Ship alternates between the two refineries, and within each visit spreads
 its cargo hold roughly evenly across whichever of the three wares that
 station currently wants, never paying more than 50cr/unit for any of them.
 
+## Handling pirates and other interruptions
+
+If a ship complies with a pirate "drop cargo" demand (or is otherwise
+interrupted mid-delivery) it can end up idle, holding cargo that no longer
+matches any of its trade orders. Every pass, if the ship currently has zero
+pending trade orders and is still holding cargo, it tries to get rid of it
+rather than sit there forever: first by delivering to a home station that
+currently wants that ware, and if none do, by selling to the best-paying
+accessible buyer within Max Jump Range (same docking/blacklist access
+checks as normal buying). This only ever runs when no trade order is
+already in progress, so it can't conflict with or double-sell cargo that's
+legitimately mid-delivery.
+
 ## Troubleshooting
 
 - **Logbook entries show "from null" and a station shows as a hex ID
@@ -213,7 +226,10 @@ your X4 logging configuration). Each pass logs:
 - with Fill Cargo Before Returning on: the starting cargo space and
   credits for the pass, and a final line once the fill pass ends showing
   how many ware types are being delivered home in one trip and how much
-  cargo space is still free (0, if the hold filled up completely).
+  cargo space is still free (0, if the hold filled up completely);
+- if the ship is idle with stray cargo: which ware, and whether it went
+  to a home station, to a fallback buyer (with which one and at what
+  price), or that neither was found yet and it'll retry next pass.
 
 Turn it back off once you're done — it writes on every pass for every
 ware, so leaving it on across a long play session will grow the log file

@@ -29,6 +29,11 @@ strategy and a price ceiling you control.
 7. It respects your Empire > Blacklist entries — blacklisted sectors and
    factions/objects are excluded from the search, on top of the normal
    docking/relation and "offer known to your faction" checks.
+8. If the ship ends up idle holding cargo it can't otherwise account for
+   — e.g. after complying with a pirate "drop cargo" demand mid-delivery —
+   it tries to deliver it to a home station that wants it, or failing
+   that, sell it to the best accessible buyer in range, rather than sit
+   there holding it indefinitely.
 
 ## Known limitations (by design, not oversights)
 
