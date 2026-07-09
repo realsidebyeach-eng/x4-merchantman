@@ -264,10 +264,10 @@
 					</do_else>
 					<do_if value="$debugtrace">
 						<do_if value="$wareprio.count gt 0">
-							<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': '+$homebuyoffers.count+' total buy offers, '+$wantedoffers.count+' match the ware priority list.'" output="false" append="true" chance="100"/>
+							<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': '+$homebuyoffers.count+' total buy offers, '+$wantedoffers.count+' match the ware priority list.'" output="false" append="true" chance="100"/>
 						</do_if>
 						<do_else>
-							<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': '+$homebuyoffers.count+' total buy offers, auto-managing all of them (no ware priority list set).'" output="false" append="true" chance="100"/>
+							<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': '+$homebuyoffers.count+' total buy offers, auto-managing all of them (no ware priority list set).'" output="false" append="true" chance="100"/>
 						</do_else>
 					</do_if>
 
@@ -312,7 +312,7 @@
 								</do_if>
 							</do_if>
 							<do_if value="$debugtrace">
-								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': fill pass starting with '+$remainingvolume+'m3 free cargo, '+$remainingbudget+'cr spendable, '+$processoffers.count+' wanted ware(s).'" output="false" append="true" chance="100"/>
+								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': fill pass starting with '+$remainingvolume+'m3 free cargo, '+$remainingbudget+'cr spendable, '+$processoffers.count+' wanted ware(s).'" output="false" append="true" chance="100"/>
 							</do_if>
 
 							<do_all exact="$processoffers.count" counter="$w">
@@ -413,12 +413,17 @@
 
 							<!-- Hold is as full as it's going to get this pass (or we ran out of wares/budget) - deliver everything bought in one batch. -->
 							<do_if value="$debugtrace">
-								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+': fill pass done, delivering '+$deliverwares.count+' ware type(s) home in one trip ('+$remainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
+								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': fill pass done, delivering '+$deliverwares.count+' ware type(s) home in one trip ('+$remainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 							</do_if>
 							<do_all exact="$deliverwares.count" counter="$d">
 								<create_trade_order name="$deliverwares.{$d}" object="this.object" tradeoffer="$deliverwares.{$d}" amount="$deliveramounts.{$d}" immediate="false"/>
 								<do_if value="$enablelogbook">
-									<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$deliveramounts.{$d}*$deliverprices.{$d}" text="{8834271,300}.[$deliveramounts.{$d},$deliverwares.{$d}.ware,$deliversellers.{$d},$deliverprices.{$d},$deliveramounts.{$d}*$deliverprices.{$d},$homestation.knownname]"/>
+									<do_if value="$isbuildstorage">
+										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$deliveramounts.{$d}*$deliverprices.{$d}" text="{8834271,301}.[$deliveramounts.{$d},$deliverwares.{$d}.ware,$deliversellers.{$d},$deliverprices.{$d},$deliveramounts.{$d}*$deliverprices.{$d},$homestation.knownname]"/>
+									</do_if>
+									<do_else>
+										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$deliveramounts.{$d}*$deliverprices.{$d}" text="{8834271,300}.[$deliveramounts.{$d},$deliverwares.{$d}.ware,$deliversellers.{$d},$deliverprices.{$d},$deliveramounts.{$d}*$deliverprices.{$d},$homestation.knownname]"/>
+									</do_else>
 								</do_if>
 							</do_all>
 							<remove_value name="$deliverwares"/>
@@ -525,9 +530,14 @@
 											<create_trade_order name="$bestseller" object="this.object" tradeoffer="$bestseller" amount="$amount" immediate="false"/>
 											<!-- Sell leg: deliver straight into the home station's own buy offer. -->
 											<create_trade_order name="$wantedoffer" object="this.object" tradeoffer="$wantedoffer" amount="$amount" immediate="false"/>
-											<do_if value="$enablelogbook">
-												<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$amount*$bestprice" text="{8834271,300}.[$amount,$ware,$sellername,$bestprice,$amount*$bestprice,$homestation.knownname]"/>
-											</do_if>
+												<do_if value="$enablelogbook">
+													<do_if value="$isbuildstorage">
+														<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$amount*$bestprice" text="{8834271,301}.[$amount,$ware,$sellername,$bestprice,$amount*$bestprice,$homestation.knownname]"/>
+													</do_if>
+													<do_else>
+														<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$amount*$bestprice" text="{8834271,300}.[$amount,$ware,$sellername,$bestprice,$amount*$bestprice,$homestation.knownname]"/>
+													</do_else>
+												</do_if>
 										</do_if>
 									</do_if>
 									<remove_value name="$foundsellers"/>

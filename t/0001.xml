@@ -15,6 +15,7 @@
 		<t id="109">Enable Logbook Entries</t>
 		<t id="111">Enable Debug Log (writes troubleshooting details to a log file)</t>
 		<t id="300">Bought %1 %2 from %3 at %4cr/unit (%5cr total) to restock %6.</t>
+		<t id="301">Bought %1 %2 from %3 at %4cr/unit (%5cr total) to fill Build Storage at %6.</t>
 		<t id="500">Station Trader</t>
 		<t id="501">Restocks the assigned home station(s) by buying their wanted wares from the cheapest accessible seller within range.</t>
 	</page>
