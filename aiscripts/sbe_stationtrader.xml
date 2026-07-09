@@ -223,9 +223,34 @@
 				<set_value name="$homestation" exact="$home.{$h2}"/>
 				<do_if value="not ($homestation == null)">
 
-					<!-- What does this station currently want to buy? If a Ware Priority List was given, restrict to that; otherwise auto-manage everything the station wants. -->
-					<create_list name="$wantedoffers"/>
-					<find_buy_offer buyer="$homestation" result="$homebuyoffers" multiple="true"/>
+					<!-- Build the ordered list of buyers to service this pass: the station's own production buy offers, and - if present and enabled - its Build Storage construction demand. Order is controlled by Build Storage First. Each category runs the full existing priority/balanced/fill-cargo pipeline independently, so "first" actually means first claim on cargo space and budget. -->
+					<create_list name="$categorybuyers"/>
+					<create_list name="$categorylabels"/>
+					<create_list name="$categoryflags"/>
+					<set_value name="$stationbuildstorage" exact="$homestation.buildstorage"/>
+					<set_value name="$hasbuildstorage" exact="$manageconstruction and not ($stationbuildstorage == null)"/>
+					<do_if value="$hasbuildstorage and $buildstoragefirst">
+						<append_to_list name="$categorybuyers" exact="$stationbuildstorage"/>
+						<append_to_list name="$categorylabels" exact="' (Build Storage)'"/>
+						<append_to_list name="$categoryflags" exact="true"/>
+					</do_if>
+					<append_to_list name="$categorybuyers" exact="$homestation"/>
+					<append_to_list name="$categorylabels" exact="''"/>
+					<append_to_list name="$categoryflags" exact="false"/>
+					<do_if value="$hasbuildstorage and not $buildstoragefirst">
+						<append_to_list name="$categorybuyers" exact="$stationbuildstorage"/>
+						<append_to_list name="$categorylabels" exact="' (Build Storage)'"/>
+						<append_to_list name="$categoryflags" exact="true"/>
+					</do_if>
+
+					<do_all exact="$categorybuyers.count" counter="$cat">
+						<set_value name="$querybuyer" exact="$categorybuyers.{$cat}"/>
+						<set_value name="$categorylabel" exact="$categorylabels.{$cat}"/>
+						<set_value name="$isbuildstorage" exact="$categoryflags.{$cat}"/>
+
+						<!-- What does this buyer currently want to buy? If a Ware Priority List was given, restrict to that; otherwise auto-manage everything it wants. -->
+						<create_list name="$wantedoffers"/>
+						<find_buy_offer buyer="$querybuyer" result="$homebuyoffers" multiple="true"/>
 					<do_if value="$wareprio.count gt 0">
 						<do_all exact="$homebuyoffers.count" counter="$o">
 							<set_value name="$candidate" exact="$homebuyoffers.{$o}"/>
@@ -524,6 +549,11 @@
 					</do_if>
 					<remove_value name="$homebuyoffers"/>
 					<remove_value name="$wantedoffers"/>
+					</do_all>
+					<remove_value name="$categorybuyers"/>
+					<remove_value name="$categorylabels"/>
+					<remove_value name="$categoryflags"/>
+					<remove_value name="$stationbuildstorage"/>
 				</do_if>
 			</do_all>
 
