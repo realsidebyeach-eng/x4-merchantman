@@ -12,6 +12,8 @@ parameters below.
 | **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage, and (in Priority mode) the order to buy them in. **Leave empty to auto-manage every ware the station currently wants to buy** — see below. If you list specific wares, only those are ever bought, even if the station is short on something else. |
 | **Balanced Mode** | on/off | off | Off = **Priority mode**. On = **Balanced mode**. See below. |
 | **Fill Cargo Before Returning** | on/off | on | On = buy from every wanted ware first, tracking remaining cargo space and credits as it goes, then deliver everything home in one trip once the hold is full or nothing more is available/affordable. Off = classic mode, buy and immediately deliver one ware at a time. See below. |
+| **Also Resupply Build Storage** | on/off | on | On = also buy construction wares a home station's Build Storage currently wants (station under construction or having a module added), same as normal production wares. Off = Build Storage is ignored entirely. See [Build Storage](#build-storage-construction-wares) below. |
+| **Build Storage First** | on/off | on | Used only when Also Resupply Build Storage is on. On = Build Storage's wanted wares are fully serviced before the station's own production-wanted wares each pass. Off = production wares first. |
 | **Max Jump Range** | 0–10 | 3 | How many jumps from a home station's own sector to search for a seller. 0 = the home station's own sector only. |
 | **Price Cap Mode** | on/off | on | On = cap is a **percentage below the home station's own price** for that ware (per-ware, automatic). Off = cap is one **flat absolute price** applied to every ware on the list. |
 | **Absolute Max Price** | 0–1,000,000 | 10,000 | Used only when Price Cap Mode is **off**. Same ceiling for every ware. |
@@ -80,6 +82,30 @@ pass`, it's `cargo space still left ÷ wares still left to consider`,
 recalculated as it goes — so earlier wares in the pass don't get an
 unfairly generous share just because later wares haven't been priced out
 yet.
+
+## Build Storage (construction wares)
+
+A station under construction — or an existing station with a module
+being added — has a separate **Build Storage** resource pool distinct
+from its normal production buy offers (in-game, this shows up as a
+separate "trade with build storage" option when right-clicking the
+station). With **Also Resupply Build Storage** on (the default), the ship
+treats Build Storage's wanted wares the same way it treats the station's
+own production wares — same Ware Priority List filter, same price-cap
+rules, same Priority/Balanced/Fill-Cargo behavior — just queried from the
+Build Storage object instead of the finished station.
+
+**Build Storage First** (default on) decides which side gets first claim
+on cargo space and credit budget when both the station and its Build
+Storage want supplies in the same pass: each category is serviced fully
+before the next is considered, so a stalled construction isn't left
+waiting behind routine production restocking (or vice versa, if you turn
+this off).
+
+Once a station finishes building (or finishes its current module
+addition), it no longer has a Build Storage object, so the ship simply
+stops finding anything in that category and continues servicing normal
+production wares as before — no reconfiguration needed.
 
 ## Price cap: percentage vs. absolute — which to use
 
@@ -200,6 +226,13 @@ legitimately mid-delivery.
   it tells you exactly how many sectors were searched, how many sellers
   were found for that ware, and either the seller it picked or the
   cheapest price it saw that still came in above the ceiling.
+- **Ship isn't buying construction wares for a station under
+  construction**: confirm **Also Resupply Build Storage** is on, and that
+  the station is actually showing a "trade with build storage" option
+  in-game right now (a station between construction phases can briefly
+  have no active Build Storage). If it's genuinely under construction and
+  still not being serviced, turn on Enable Debug Log — lines tagged
+  `(Build Storage)` show what was found for that category each pass.
 
 ## Debugging
 

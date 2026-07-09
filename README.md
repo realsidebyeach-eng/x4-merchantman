@@ -34,6 +34,10 @@ strategy and a price ceiling you control.
    it tries to deliver it to a home station that wants it, or failing
    that, sell it to the best accessible buyer in range, rather than sit
    there holding it indefinitely.
+9. It also resupplies a home station's Build Storage — construction-phase
+   demand for a station under construction or having a module added —
+   alongside its normal production buy offers, controlled by **Also
+   Resupply Build Storage** and **Build Storage First**.
 
 ## Known limitations (by design, not oversights)
 
@@ -42,8 +46,6 @@ strategy and a price ceiling you control.
   parameter UI doesn't support a "table of ware → number" widget. Use
   **Price Cap Mode = on** (percent below home price) for genuine per-ware
   differentiation instead.
-- Station build-storage restocking (a separate buyer object some stations
-  have) isn't included; only the station's own regular buy offers are read.
 
 ## Files
 
