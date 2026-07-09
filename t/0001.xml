@@ -5,6 +5,8 @@
 		<t id="102">Ware Priority List (top = highest priority)</t>
 		<t id="103">Balanced Mode (spread purchases evenly instead of top-to-bottom priority)</t>
 		<t id="112">Fill Cargo Before Returning (buy every wanted ware first, deliver all at once; off = classic immediate buy-then-deliver per ware)</t>
+		<t id="113">Also Resupply Build Storage (buy construction wares for stations under construction or being expanded)</t>
+		<t id="114">Service Build Storage First (before production wares, when both need supplies this pass)</t>
 		<t id="104">Max Jump Range (sectors from home)</t>
 		<t id="105">Price Cap Mode: on = % below home sell price, off = absolute max price</t>
 		<t id="106">Absolute Max Price per Unit (used when Price Cap Mode is off)</t>
