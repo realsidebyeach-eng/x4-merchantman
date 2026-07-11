@@ -96,52 +96,49 @@ The existing 6-queued-trade-orders cap is shared and checked live, so the
 sell pass (running first) naturally leaves whatever capacity remains for
 the buy pass in the same tick — no new bookkeeping needed.
 
-## Implementation approach: shared library
+## Implementation approach: inline duplication (verified against the schema)
 
 The sell pipeline is structurally a mirror of the buy pipeline (search
 direction and price comparison flip: cheapest-seller-below-ceiling becomes
 priciest-buyer-above-floor), but unlike the Build Storage feature it can't
 reuse the existing category-loop trick, because that trick works by
 looping the *same* direction of trade over two different buyer objects —
-buy vs. sell is a genuinely different direction. Implementing it as a full
-inline copy would roughly double the existing ~275-line buying pipeline and
-push the main script past this project's 800-line file guideline.
+buy vs. sell is a genuinely different direction.
 
-Instead, the shared "find the best accessible counterparty within a price
-bound, then place the matching trade-order pair" logic is extracted into a
-new library file (`libraries/sbe_stationtrader_lib.xml`), referenced from
-both the buy and sell passes via `<include_actions>` — the same general
-mechanism `<include_interrupt_actions ref="GetBlacklistgroup"/>` already
-uses for a *vanilla*-provided library, just authored for the first time in
-this mod. This keeps the main script's size in check and follows this
-project's "many small files" preference.
+A shared-library extraction was considered (and was this design's original
+recommendation) to avoid duplicating the ~275-line buying pipeline, but it
+was checked against this machine's local copy of X4's `aiscripts.xsd`
+schema before committing to it in a plan, and ruled out: the schema only
+defines reusable-action-library support (`interrupt_library`,
+`<include_interrupt_actions>`) for the `<interrupts>` block.
+`GetBlacklistgroup` works only because interrupt handlers have their own
+library system; the main `<attention><actions>` body — where this entire
+pipeline lives — has no equivalent `<include_actions>` mechanism, and the
+schema defines no `call_script`/subroutine primitive either. This isn't a
+runtime risk to flag and verify later, the way Build Storage's
+`buildstorage` property guess was — it's a static fact about the schema,
+confirmed directly rather than guessed.
 
-The exact XML mechanics of authoring and referencing a custom
-(non-vanilla) library — parameter passing in/out of an `<include_actions>`
-call, whether it can return values the caller needs (best counterparty
-found, amount, etc.) — is a plan/implementation-time detail, not a
-design-time one, matching how the Build Storage design deferred its own
-query-syntax specifics.
+So the sell pipeline is implemented as a full inline mirror of the buy
+pipeline in `aiscripts/sbe_stationtrader.xml`, following exactly the
+pattern the Build Storage feature already proved out (its category loop is
+proof this project's inline-duplication style scales to a second
+concern). The main script grows to roughly 800–900 lines as a result — the
+per-file size guideline is a preference to weigh against available
+mechanisms, not an absolute ceiling, and no mechanism exists here to keep
+it smaller. If file size becomes a real problem later, the only genuine
+option would be splitting the buy and sell logic into two separate order
+scripts entirely (two ship orders instead of one) — out of scope for this
+feature since it would change the mod's UI shape (one order, two roles)
+that was already agreed on.
 
 ## Known risk (flagged, not hidden)
 
-`<include_actions>` for a custom, mod-authored library (as opposed to a
-vanilla one like `GetBlacklistgroup`) is unverified in this codebase — no
-existing file does this. This is the same category of risk the Build
-Storage feature flagged for its `buildstorage` property query, which
-turned out fine, but this one is a bigger structural bet since the whole
-sell pipeline depends on it working (parameter/return-value passing in
-particular).
-
-**Required verification step**: after implementation, test in-game with
-**Enable Debug Log** on, with a ship assigned to a station that has both
-buy and sell demand, and confirm both passes actually execute and produce
-correct trade orders. If custom `<include_actions>` doesn't work as
-expected (e.g. no way to pass back a found offer/amount to the caller), the
-fallback is inline duplication of the pipeline in the main script, accepted
-by you as the explicit fallback during design — this doesn't change any of
-the params, ordering, price-floor logic, or docs described above, only
-where the code physically lives.
+None specific to this feature's mechanism — the schema check above removes
+the risk the original design carried. The only remaining unknown is
+functional, not syntactic: confirming in-game that the sell pass actually
+finds the station's own sell offers and accessible external buyers as
+expected, same as any new logic in this codebase would need a smoke test.
 
 ## Docs
 
@@ -153,8 +150,8 @@ where the code physically lives.
 - `docs/CONFIGURATION.md` — new rows for `enablebuying`/`enableselling` in
   the parameter reference table, a short "Buying vs Selling" explainer
   section (in the style of the existing "Priority vs Balanced" / "Fill
-  Cargo" sections), and a troubleshooting entry for the new library
-  mechanism specifically (what to check if selling silently never fires).
+  Cargo" sections), and a troubleshooting entry for selling specifically
+  (what to check if the ship never exports anything).
 - `t/0001.xml` — new text IDs for the two new param labels/comments and a
   new logbook entry string for export deliveries (next available ID after
   the existing 300/301 Build Storage entries, e.g. 302).
