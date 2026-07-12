@@ -13,7 +13,7 @@ parameters below.
 | **Enable Selling** | on/off | on | On = sell the station's surplus wares (its active sell offers) to the best accessible buyer. See [Buying vs Selling](#buying-vs-selling-roles) below. |
 | **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage, and (in Priority mode) the order to handle them in — applies to both buying and selling. **Leave empty to auto-manage every ware the station currently wants to buy and/or sell** — see below. If you list specific wares, only those are ever bought/sold, even if the station has demand or surplus elsewhere. |
 | **Balanced Mode** | on/off | off | Off = **Priority mode**. On = **Balanced mode**. See below. |
-| **Fill Cargo Before Returning** | on/off | on | On = buy from every wanted ware first, tracking remaining cargo space and credits as it goes, then deliver everything home in one trip once the hold is full or nothing more is available/affordable. Off = classic mode, buy and immediately deliver one ware at a time. See below. |
+| **Fill Cargo Before Returning** | on/off | on | On = buy and/or sell (per whichever roles are enabled) from every wanted/sellable ware first, tracking remaining cargo space (and credits, for buying) as it goes, then deliver/export everything home or to buyers in one trip once the hold is full or nothing more is available/affordable. Off = classic mode, buy or sell and immediately deliver/export one ware at a time. See below. |
 | **Also Resupply Build Storage** | on/off | on | On = also buy construction wares a home station's Build Storage currently wants (station under construction or having a module added), same as normal production wares. Off = Build Storage is ignored entirely. See [Build Storage](#build-storage-construction-wares) below. |
 | **Build Storage First** | on/off | on | Used only when Also Resupply Build Storage is on. On = Build Storage's wanted wares are fully serviced before the station's own production-wanted wares each pass. Off = production wares first. |
 | **Max Jump Range** | 0–10 | 3 | How many jumps from a home station's own sector to search for a seller. 0 = the home station's own sector only. |
@@ -62,11 +62,20 @@ no list to order), so the ship instead processes whichever wanted ware is
 most understocked first (lowest stock level relative to the station's
 target).
 
+The same applies to selling: leave the list empty and, with Enable Selling
+on, the ship manages *every* ware the home station currently has for sale,
+reacting to whatever its own sell offers show at the time. In Priority mode
+with auto-detect, selling mirrors buying but in the opposite direction — it
+processes whichever sellable ware is most oversupplied first (highest stock
+level relative to the station's target), instead of most understocked
+first.
+
 List specific wares instead if you want to (a) restrict the ship to only
-some of what the station wants — e.g. a station that trades a wide basket
-but you only want this particular ship handling raw minerals — or (b) force
-a specific top-to-bottom priority order in Priority mode regardless of
-current stock levels.
+some of what the station wants or has for sale — e.g. a station that trades
+a wide basket but you only want this particular ship handling raw minerals
+— or (b) force a specific top-to-bottom priority order in Priority mode
+regardless of current stock levels. The same list applies to both roles at
+once — see [Buying vs. Selling roles](#buying-vs-selling-roles) above.
 
 ## Priority mode vs. Balanced mode
 
