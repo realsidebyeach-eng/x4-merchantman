@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
-<!-- Restocks one or more assigned home stations by buying the wares they currently want from the cheapest accessible seller within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="11">
+<!-- Restocks one or more assigned home stations: buys the wares they currently want from the cheapest accessible seller, and/or sells their production surplus to the best-paying accessible buyer, within a configurable jump range. -->
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="12">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -9,6 +9,10 @@
 				<input_param name="type" value="'object'"/>
 				<input_param name="class" value="[class.station]"/>
 			</param>
+			<!-- true: buy wares this station currently wants from the cheapest accessible external seller and deliver them home. -->
+			<param name="enablebuying" default="true" type="bool" text="{8834271,115}" comment="Buy wares the station wants and deliver them home."/>
+			<!-- true: pick up wares this station currently has for sale (its production surplus) and sell them to the best-paying accessible external buyer. -->
+			<param name="enableselling" default="true" type="bool" text="{8834271,116}" comment="Sell the station's surplus wares to the best accessible buyer."/>
 			<!-- The wares this ship is allowed to manage, in priority order (top = highest priority). Leave empty to auto-manage every ware the station currently wants to buy. -->
 			<param name="wareprio" default="[]" type="list" text="{8834271,102}" comment="Wares to manage, top to bottom priority. Leave empty to auto-manage everything the station wants.">
 				<input_param name="type" value="'ware'"/>
@@ -101,6 +105,14 @@
 		</do_if>
 		<do_if value="$buildstoragefirst == null">
 			<set_value name="$buildstoragefirst" exact="true"/>
+		</do_if>
+	</patch>
+	<patch sinceversion="12">
+		<do_if value="$enablebuying == null">
+			<set_value name="$enablebuying" exact="true"/>
+		</do_if>
+		<do_if value="$enableselling == null">
+			<set_value name="$enableselling" exact="true"/>
 		</do_if>
 	</patch>
 	<attention min="unknown">

@@ -2,6 +2,8 @@
 <language id="44">
 	<page id="8834271" title="Station Trader Assignments" descr="Text for the Station Trader order" voice="no">
 		<t id="101">Home Station(s)</t>
+		<t id="115">Enable Buying (buy wares the station wants and deliver them home)</t>
+		<t id="116">Enable Selling (sell the station's surplus wares to the best accessible buyer)</t>
 		<t id="102">Ware Priority List (top = highest priority)</t>
 		<t id="103">Balanced Mode (spread purchases evenly instead of top-to-bottom priority)</t>
 		<t id="112">Fill Cargo Before Returning (buy every wanted ware first, deliver all at once; off = classic immediate buy-then-deliver per ware)</t>
@@ -17,6 +19,6 @@
 		<t id="300">Bought %1 %2 from %3 at %4cr/unit (%5cr total) to restock %6.</t>
 		<t id="301">Bought %1 %2 from %3 at %4cr/unit (%5cr total) to fill Build Storage at %6.</t>
 		<t id="500">Station Trader</t>
-		<t id="501">Restocks the assigned home station(s) by buying their wanted wares from the cheapest accessible seller within range.</t>
+		<t id="501">Restocks the assigned home station(s): buys their wanted wares from the cheapest accessible seller and/or sells their surplus wares to the best-paying accessible buyer, within range.</t>
 	</page>
 </language>
