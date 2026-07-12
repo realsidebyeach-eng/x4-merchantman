@@ -9,7 +9,9 @@ parameters below.
 | Parameter | Type | Default | Meaning |
 |---|---|---|---|
 | **Home Station(s)** | station list | empty | One or more stations this ship restocks. Pick multiple to have one ship service several stations in rotation. |
-| **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage, and (in Priority mode) the order to buy them in. **Leave empty to auto-manage every ware the station currently wants to buy** — see below. If you list specific wares, only those are ever bought, even if the station is short on something else. |
+| **Enable Buying** | on/off | on | On = buy wares the station wants and deliver them home. See [Buying vs Selling](#buying-vs-selling-roles) below. |
+| **Enable Selling** | on/off | on | On = sell the station's surplus wares (its active sell offers) to the best accessible buyer. See [Buying vs Selling](#buying-vs-selling-roles) below. |
+| **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage, and (in Priority mode) the order to handle them in — applies to both buying and selling. **Leave empty to auto-manage every ware the station currently wants to buy and/or sell** — see below. If you list specific wares, only those are ever bought/sold, even if the station has demand or surplus elsewhere. |
 | **Balanced Mode** | on/off | off | Off = **Priority mode**. On = **Balanced mode**. See below. |
 | **Fill Cargo Before Returning** | on/off | on | On = buy from every wanted ware first, tracking remaining cargo space and credits as it goes, then deliver everything home in one trip once the hold is full or nothing more is available/affordable. Off = classic mode, buy and immediately deliver one ware at a time. See below. |
 | **Also Resupply Build Storage** | on/off | on | On = also buy construction wares a home station's Build Storage currently wants (station under construction or having a module added), same as normal production wares. Off = Build Storage is ignored entirely. See [Build Storage](#build-storage-construction-wares) below. |
@@ -21,6 +23,34 @@ parameters below.
 | **Scan Performance** | 1–15 | 5 | How many offer checks run per simulation tick before yielding. Lower this if you assign the order to many ships simultaneously and notice stutter; raise it for faster reactions on a lightly-loaded save. |
 | **Enable Logbook Entries** | on/off | on | Writes a Logbook entry (Menu → Logbook) for every completed delivery: ware, amount, seller, price, total cost, and home station, with a "show on map" link. Turn off if you're running many traders and don't want the Logbook flooded. |
 | **Enable Debug Log** | on/off | off | Writes a detailed trace to a log file every pass — see [Debugging](#debugging) below. Leave off during normal play; turn on only while troubleshooting a specific ship. |
+
+## Buying vs. Selling roles
+
+**Enable Buying** and **Enable Selling** are independent on/off switches
+(both on by default) — a ship can be buy-only, sell-only, or both. When
+both are on for the same ship, **selling always runs before buying** in
+every pass, for every home station: it's a fixed order, not configurable,
+because freeing up cargo space and generating income before the buy pass
+spends either is the sensible default. This has no effect if a station only
+ever has demand in one direction.
+
+Selling mirrors buying's mechanics exactly — same Ware Priority List, same
+Balanced/Priority mode, same Fill Cargo Before Returning behavior — just in
+reverse: it reads the station's own active **sell** offers instead of its
+buy offers, searches for the best-paying accessible buyer instead of the
+cheapest accessible seller, and picks up the ware from the home station
+instead of delivering to it.
+
+The one place selling is deliberately simpler than buying: there's no
+Price Cap Mode / Min Discount % equivalent for selling. The floor is always
+exactly the home station's own current sell-offer price for that ware — the
+ship never accepts less than the station itself is already asking. If no
+accessible buyer meets that floor, the ware is left for a future pass, same
+as a buy-side ware with no seller under the ceiling.
+
+Build Storage (see below) is a buying-only concept — it represents
+construction demand, not surplus to sell, so **Enable Selling** never
+touches it.
 
 ## Auto-detect vs. an explicit ware list
 
@@ -58,23 +88,24 @@ input hauler feeding several inputs a production module needs in parallel
 
 ## Fill Cargo Before Returning vs. classic mode
 
-**Fill Cargo Before Returning** (default, on): each pass, the ship buys from
-every wanted ware it can find a valid deal for — tracking a running "how
-much cargo space is left" and "how many credits are left" as it goes — and
-only queues the delivery-to-home trade orders at the very end, once the
+**Fill Cargo Before Returning** (default, on): each pass, the ship buys (or,
+with Enable Selling on, picks up for export) from every wanted/sellable
+ware it can find a valid deal for — tracking a running "how much cargo
+space is left" (and, for buying, "how many credits are left") as it goes —
+and only queues the delivery/export trade orders at the very end, once the
 hold is as full as it's going to get this pass. It only "returns short"
-(delivers less than a full hold) when there genuinely isn't enough
-available: no more wares have a seller under the price ceiling, the credit
-budget runs out, or the hold physically fills up. This means fewer separate
-round trips overall — the ship gathers several wares in one outing before
-heading home to unload, instead of shuttling back and forth for each ware
-individually.
+(delivers/exports less than a full hold) when there genuinely isn't enough
+available: no more wares have a seller under the price ceiling (or buyer
+over the price floor), the credit budget runs out (buying only), or the
+hold physically fills up. This means fewer separate round trips overall —
+the ship gathers or exports several wares in one outing instead of
+shuttling back and forth for each ware individually.
 
 **Classic mode** (Fill Cargo Before Returning = off): the original
-behavior — for each wanted ware, buy it and immediately queue the delivery
-to home before considering the next ware. More round trips, but the home
-station starts receiving partial deliveries sooner rather than waiting for
-a full hold.
+behavior — for each wanted/sellable ware, buy or sell it and immediately
+queue the delivery/export before considering the next ware. More round
+trips, but the home station's demand or surplus starts being worked sooner
+rather than waiting for a full hold.
 
 In Balanced mode, Fill Cargo Before Returning also changes how the "fair
 share" cargo cap is computed: instead of a flat `hold ÷ wares wanted this
@@ -233,6 +264,15 @@ legitimately mid-delivery.
   have no active Build Storage). If it's genuinely under construction and
   still not being serviced, turn on Enable Debug Log — lines tagged
   `(Build Storage)` show what was found for that category each pass.
+- **Ship never exports anything**: confirm **Enable Selling** is on, and
+  that the home station actually has an active sell offer for at least one
+  ware right now (check the station's own Trade menu in-game — "selling"
+  wares are shown there). If you populated Ware Priority List, confirm at
+  least one of those wares is among what the station is currently selling.
+  Also check Max Jump Range reaches a buyer your faction can dock at, and
+  remember the price floor is always the home station's own current asking
+  price — a buyer offering less than that is correctly skipped, not a bug.
+  Turn on Enable Debug Log and look for lines tagged `(Selling)`.
 
 ## Debugging
 
