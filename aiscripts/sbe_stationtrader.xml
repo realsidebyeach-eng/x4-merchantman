@@ -235,6 +235,7 @@
 				<set_value name="$homestation" exact="$home.{$h2}"/>
 				<do_if value="not ($homestation == null)">
 
+					<do_if value="$enablebuying">
 					<!-- Build the ordered list of buyers to service this pass: the station's own production buy offers, and - if present and enabled - its Build Storage construction demand. Order is controlled by Build Storage First. Each category runs the full existing priority/balanced/fill-cargo pipeline independently, so "first" actually means first claim on cargo space and budget. -->
 					<create_list name="$categorybuyers"/>
 					<create_list name="$categorylabels"/>
@@ -576,6 +577,7 @@
 					<remove_value name="$categorylabels"/>
 					<remove_value name="$categoryflags"/>
 					<remove_value name="$stationbuildstorage"/>
+					</do_if>
 				</do_if>
 			</do_all>
 
