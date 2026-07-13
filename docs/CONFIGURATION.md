@@ -221,6 +221,20 @@ checks as normal buying). This only ever runs when no trade order is
 already in progress, so it can't conflict with or double-sell cargo that's
 legitimately mid-delivery.
 
+## Deliveries to your own home station are always free
+
+Every trade order that delivers cargo already in the ship's hold to one of
+its home stations — the normal restock delivery, the Build Storage
+delivery, and the stray-cargo fallback above — is priced at 0cr. The wares
+were already paid for once, when the ship bought them from an external
+seller (or however stray cargo was acquired); charging the home station's
+own account a second time for the same goods would be redundant, and if
+that station's own account happened to be low on funds, it would block the
+delivery entirely and leave the ship stuck holding cargo it could never
+unload. This has no effect on the Logbook — completed-delivery entries
+always show the real acquisition price (what was paid to the external
+seller), never the home-delivery price.
+
 ## Troubleshooting
 
 - **Logbook entries show "from null" and a station shows as a hex ID

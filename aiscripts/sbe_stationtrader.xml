@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations: buys the wares they currently want from the cheapest accessible seller, and/or sells their production surplus to the best-paying accessible buyer, within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="12">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="13">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -179,7 +179,7 @@
 									<do_if value="not ($strayhome == null)">
 										<find_buy_offer tradepartner="this.ship" buyer="$strayhome" wares="$strayware" result="$strayhomeoffer"/>
 										<do_if value="$strayhomeoffer.available">
-											<create_trade_order name="$strayhomeoffer" object="this.object" tradeoffer="$strayhomeoffer" amount="[$strayamount,$strayhomeoffer.amount].min" immediate="false"/>
+											<create_trade_order name="$strayhomeoffer" object="this.object" tradeoffer="$strayhomeoffer" amount="[$strayamount,$strayhomeoffer.amount].min" price="0" immediate="false"/>
 											<set_value name="$strayhandled" exact="true"/>
 											<do_if value="$debugtrace">
 												<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Stray cargo: delivering '+$strayamount+' '+$strayware+' to home station '+$strayhome.knownname+'.'" output="false" append="true" chance="100"/>
@@ -698,7 +698,7 @@
 								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': fill pass done, delivering '+$deliverwares.count+' ware type(s) home in one trip ('+$remainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 							</do_if>
 							<do_all exact="$deliverwares.count" counter="$d">
-								<create_trade_order name="$deliverwares.{$d}" object="this.object" tradeoffer="$deliverwares.{$d}" amount="$deliveramounts.{$d}" immediate="false"/>
+								<create_trade_order name="$deliverwares.{$d}" object="this.object" tradeoffer="$deliverwares.{$d}" amount="$deliveramounts.{$d}" price="0" immediate="false"/>
 								<do_if value="$enablelogbook">
 									<do_if value="$isbuildstorage">
 										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$deliveramounts.{$d}*$deliverprices.{$d}" text="{8834271,301}.[$deliveramounts.{$d},$deliverwares.{$d}.ware,$deliversellers.{$d},$deliverprices.{$d},$deliveramounts.{$d}*$deliverprices.{$d},$homestation.knownname]"/>
@@ -811,7 +811,7 @@
 											<!-- Buy leg: purchase from the cheapest accessible seller. -->
 											<create_trade_order name="$bestseller" object="this.object" tradeoffer="$bestseller" amount="$amount" immediate="false"/>
 											<!-- Sell leg: deliver straight into the home station's own buy offer. -->
-											<create_trade_order name="$wantedoffer" object="this.object" tradeoffer="$wantedoffer" amount="$amount" immediate="false"/>
+											<create_trade_order name="$wantedoffer" object="this.object" tradeoffer="$wantedoffer" amount="$amount" price="0" immediate="false"/>
 												<do_if value="$enablelogbook">
 													<do_if value="$isbuildstorage">
 														<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$amount*$bestprice" text="{8834271,301}.[$amount,$ware,$sellername,$bestprice,$amount*$bestprice,$homestation.knownname]"/>
