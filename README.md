@@ -62,6 +62,17 @@ control. Buying and selling are independently toggleable per ship via
   parameter UI doesn't support a "table of ware → number" widget. Use
   **Price Cap Mode = on** (percent below home price) for genuine per-ware
   differentiation instead.
+- **A ship's automated travel can still pass through a blacklisted sector**
+  as a waypoint en route to a legitimate, non-blacklisted trade
+  destination. This mod never issues travel/movement commands itself —
+  `create_trade_order` hands the actual flying to X4's standard trade-order
+  AI, the same mechanism every trade ship in the game uses. There is no
+  route-safety/avoidance action exposed anywhere in the X4 script schema
+  for an order script to use, so this mod has no way to influence the
+  flight path taken to reach a chosen destination — only which destination
+  gets chosen in the first place (which does correctly avoid blacklisted
+  sectors). Lowering **Max Jump Range** reduces how far a ship will reach
+  for a deal, which is the only available mitigation.
 
 ## Files
 
