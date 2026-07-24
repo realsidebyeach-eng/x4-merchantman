@@ -179,10 +179,14 @@
 									<do_if value="not ($strayhome == null)">
 										<find_buy_offer tradepartner="this.ship" buyer="$strayhome" wares="$strayware" result="$strayhomeoffer"/>
 										<do_if value="$strayhomeoffer.available">
-											<create_trade_order name="$strayhomeoffer" object="this.object" tradeoffer="$strayhomeoffer" amount="[$strayamount,$strayhomeoffer.amount].min" price="0" immediate="false"/>
-											<set_value name="$strayhandled" exact="true"/>
-											<do_if value="$debugtrace">
-												<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Stray cargo: delivering '+$strayamount+' '+$strayware+' to home station '+$strayhome.knownname+'.'" output="false" append="true" chance="100"/>
+											<!-- $strayhomeoffer.amount can be 0 (home currently has no live storage room) even while the offer itself stays active - only count this as handled when a real amount will actually move. -->
+											<set_value name="$strayhomeamount" exact="[$strayamount,$strayhomeoffer.amount].min"/>
+											<do_if value="$strayhomeamount gt 0">
+												<create_trade_order name="$strayhomeoffer" object="this.object" tradeoffer="$strayhomeoffer" amount="$strayhomeamount" price="0" immediate="false"/>
+												<set_value name="$strayhandled" exact="true"/>
+												<do_if value="$debugtrace">
+													<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'Stray cargo: delivering '+$strayhomeamount+' '+$strayware+' to home station '+$strayhome.knownname+'.'" output="false" append="true" chance="100"/>
+												</do_if>
 											</do_if>
 										</do_if>
 										<remove_value name="$strayhomeoffer"/>
