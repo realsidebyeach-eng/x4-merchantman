@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations: buys the wares they currently want from the cheapest accessible seller, and/or sells their production surplus to the best-paying accessible buyer, within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="14">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="15">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -590,11 +590,6 @@
 							<set_value name="$seedware" exact="$processoffers.{1}.ware"/>
 							<set_value name="$remainingvolume" exact="this.ship.cargo.{$seedware}.free * $seedware.volume"/>
 							<set_value name="$remainingbudget" exact="player.money/100"/>
-							<do_if value="this.ship.commander">
-								<do_if value="this.ship.commander.hasownaccount and this.ship.commander.money gt 0">
-									<set_value name="$remainingbudget" exact="this.ship.commander.money/100"/>
-								</do_if>
-							</do_if>
 							<do_if value="$debugtrace">
 								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': fill pass starting with '+$remainingvolume+'m3 free cargo, '+$remainingbudget+'cr spendable, '+$processoffers.count+' wanted ware(s).'" output="false" append="true" chance="100"/>
 							</do_if>
@@ -792,11 +787,6 @@
 										<!-- Capture the seller's name now, before create_trade_order consumes $bestseller below (reading $bestseller.seller afterwards returns null). -->
 										<set_value name="$sellername" exact="$bestseller.seller.knownname"/>
 										<set_value name="$spendablemoney" exact="player.money/100"/>
-										<do_if value="this.ship.commander">
-											<do_if value="this.ship.commander.hasownaccount and this.ship.commander.money gt 0">
-												<set_value name="$spendablemoney" exact="this.ship.commander.money/100"/>
-											</do_if>
-										</do_if>
 
 										<set_value name="$cargocap" exact="this.ship.cargo.{$ware}.free"/>
 										<do_if value="$balanced">
