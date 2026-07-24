@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations: buys the wares they currently want from the cheapest accessible seller, and/or sells their production surplus to the best-paying accessible buyer, within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="16">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="17">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -665,9 +665,8 @@
 											<set_value name="$wareunitcap" exact="[$wareunitcap/$remainingcount,1].max"/>
 										</do_if>
 
-										<set_value name="$amount" exact="[$wareunitcap,$bestseller.amount,$wantedoffer.amount,$remainingbudget/$bestprice].min"/>
-										<!-- $wantedoffer.amount is a demand target, not live storage room - clamp against the home's actual current capacity so the ship never buys more than it can deliver. -->
-										<clamp_trade_amount trade="$wantedoffer" amount="$amount" buyer="$homestation" result="$amount"/>
+										<!-- $wantedoffer.amount is a demand target, not live storage room. $homestation.cargo.{$ware}.free is the station's real current free space for this ware - storage only, never money, since the home-delivery leg below always executes at price="0" and must never be limited by the station's account balance. -->
+										<set_value name="$amount" exact="[$wareunitcap,$bestseller.amount,$wantedoffer.amount,$remainingbudget/$bestprice,$homestation.cargo.{$ware}.free].min"/>
 										<do_if value="$debugtrace">
 											<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': picked '+$sellername+' at '+$bestprice+'cr/unit, amount='+$amount+' (wareunitcap='+$wareunitcap+', sellerhas='+$bestseller.amount+', homewants='+$wantedoffer.amount+', afford='+($remainingbudget/$bestprice)+')'" output="false" append="true" chance="100"/>
 										</do_if>
@@ -701,8 +700,8 @@
 								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': fill pass done, delivering '+$deliverwares.count+' ware type(s) home in one trip ('+$remainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 							</do_if>
 							<do_all exact="$deliverwares.count" counter="$d">
-								<!-- Re-check live storage room right before delivering: an earlier ware in this same batch may have already used up shared capacity. -->
-								<clamp_trade_amount trade="$deliverwares.{$d}" amount="$deliveramounts.{$d}" buyer="$homestation" result="$deliverclamped"/>
+								<!-- Re-check live storage room right before delivering: an earlier ware in this same batch may have already used up shared capacity. Storage only, never money - this leg always executes at price="0". -->
+								<set_value name="$deliverclamped" exact="[$deliveramounts.{$d},$homestation.cargo.{$deliverwares.{$d}.ware}.free].min"/>
 								<create_trade_order name="$deliverwares.{$d}" object="this.object" tradeoffer="$deliverwares.{$d}" amount="$deliverclamped" price="0" immediate="false"/>
 								<do_if value="$enablelogbook">
 									<do_if value="$isbuildstorage">
@@ -802,9 +801,8 @@
 											<set_value name="$cargocap" exact="[$cargocap/$processoffers.count,1].max"/>
 										</do_if>
 
-										<set_value name="$amount" exact="[$cargocap,$bestseller.amount,$wantedoffer.amount,$spendablemoney/(2*$bestprice)].min"/>
-										<!-- $wantedoffer.amount is a demand target, not live storage room - clamp against the home's actual current capacity so the ship never buys more than it can deliver. -->
-										<clamp_trade_amount trade="$wantedoffer" amount="$amount" buyer="$homestation" result="$amount"/>
+										<!-- $wantedoffer.amount is a demand target, not live storage room. $homestation.cargo.{$ware}.free is the station's real current free space for this ware - storage only, never money, since the home-delivery leg below always executes at price="0" and must never be limited by the station's account balance. -->
+										<set_value name="$amount" exact="[$cargocap,$bestseller.amount,$wantedoffer.amount,$spendablemoney/(2*$bestprice),$homestation.cargo.{$ware}.free].min"/>
 										<do_if value="$debugtrace">
 											<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  '+$ware+': amount='+$amount+' (cargocap='+$cargocap+', sellerhas='+$bestseller.amount+', homewants='+$wantedoffer.amount+', afford='+($spendablemoney/(2*$bestprice))+')'" output="false" append="true" chance="100"/>
 										</do_if>
