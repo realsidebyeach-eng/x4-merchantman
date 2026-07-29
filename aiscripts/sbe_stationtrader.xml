@@ -716,7 +716,7 @@
 								<create_trade_order name="$decidedsellers.{$d}" object="this.object" tradeoffer="$decidedsellers.{$d}" amount="$decidedamounts.{$d}" immediate="false"/>
 							</do_all>
 							<do_all exact="$decidedwares.count" counter="$d2">
-								<!-- Re-check live storage room right before delivering: an earlier ware in this same batch may have already used up shared capacity. Storage only, never money - this leg always executes at price="0". -->
+								<!-- Clamp against the buyer's live storage room for this ware. Nothing executes between the queued orders in this loop, so this reads the same value for every ware in this batch - it does NOT yet account for two decided wares sharing the same storage pool within one pass (tracked as a known follow-up). Storage only, never money - this leg always executes at price="0". -->
 								<set_value name="$deliverclamped" exact="[$decidedamounts.{$d2},$querybuyer.cargo.{$decidedwarenames.{$d2}}.free].min"/>
 								<create_trade_order name="$decidedwares.{$d2}" object="this.object" tradeoffer="$decidedwares.{$d2}" amount="$deliverclamped" price="0" immediate="false"/>
 								<do_if value="$enablelogbook">
