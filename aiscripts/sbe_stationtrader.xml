@@ -292,20 +292,21 @@
 							</do_else>
 
 							<do_if value="$fillcargo">
-								<!-- Fill-cargo mode for selling: pick up every sellable ware from home first (tracking a running cargo-space budget across the whole pass - no credit budget needed, we're earning rather than spending), then export everything to its buyer in one batch at the end. -->
-								<create_list name="$sellexportwares"/>
-								<create_list name="$sellexportamounts"/>
-								<create_list name="$sellexportbuyers"/>
-								<create_list name="$sellexportbuyernames"/>
-								<create_list name="$sellexportprices"/>
+								<!-- Fill-cargo mode for selling: decide every sellable ware first (search freely, no trade orders yet), then create every trade order back-to-back at the end with no searching in between - creating a trade order appears to let the game engine take over the ship at the next search wait, so nothing after that point in the same pass would otherwise run. -->
+								<create_list name="$selldecidedwares"/>
+								<create_list name="$selldecidedamounts"/>
+								<create_list name="$selldecidedbuyers"/>
+								<create_list name="$selldecidedbuyernames"/>
+								<create_list name="$selldecidedprices"/>
 								<set_value name="$sellseedware" exact="$sellprocessoffers.{1}.ware"/>
 								<set_value name="$sellremainingvolume" exact="this.ship.cargo.{$sellseedware}.free * $sellseedware.volume"/>
+								<set_value name="$sellstartingorders" exact="this.ship.tradeorders.count"/>
 								<do_if value="$debugtrace">
 									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+' (Selling)'+': fill pass starting with '+$sellremainingvolume+'m3 free cargo, '+$sellprocessoffers.count+' sellable ware(s).'" output="false" append="true" chance="100"/>
 								</do_if>
 
 								<do_all exact="$sellprocessoffers.count" counter="$sw">
-									<do_if value="(this.ship.tradeorders.count lt 6) and ($sellremainingvolume gt 0)">
+									<do_if value="(($sellstartingorders+($selldecidedwares.count*2)) lt 6) and ($sellremainingvolume gt 0)">
 										<set_value name="$sellwantedoffer" exact="$sellprocessoffers.{$sw}"/>
 										<set_value name="$sellware" exact="$sellwantedoffer.ware"/>
 
@@ -350,7 +351,7 @@
 										</do_all>
 
 										<do_if value="not ($sellbestbuyer == 0)">
-											<!-- Capture the buyer's name now, before create_trade_order consumes $sellbestbuyer below (reading $sellbestbuyer.buyer afterwards returns null). -->
+											<!-- Capture the buyer's name now, before the commit phase's create_trade_order consumes $sellbestbuyer (reading $sellbestbuyer.buyer afterwards returns null). -->
 											<set_value name="$sellbuyername" exact="$sellbestbuyer.buyer.knownname"/>
 											<set_value name="$sellwareunitcap" exact="$sellremainingvolume/$sellware.volume"/>
 											<do_if value="$balanced">
@@ -365,13 +366,12 @@
 											</do_if>
 
 											<do_if value="$sellamount gt 0">
-												<!-- Pick-up leg now; the matching export/sell leg is queued after the whole hold is filled. -->
-												<create_trade_order name="$sellwantedoffer" object="this.object" tradeoffer="$sellwantedoffer" amount="$sellamount" immediate="false"/>
-												<append_to_list name="$sellexportwares" exact="$sellware"/>
-												<append_to_list name="$sellexportamounts" exact="$sellamount"/>
-												<append_to_list name="$sellexportbuyers" exact="$sellbestbuyer"/>
-												<append_to_list name="$sellexportbuyernames" exact="$sellbuyername"/>
-												<append_to_list name="$sellexportprices" exact="$sellbestprice"/>
+												<!-- Record the decision only - every trade order for this pass is created together in the commit phase below, after all searching is done. -->
+												<append_to_list name="$selldecidedwares" exact="$sellwantedoffer"/>
+												<append_to_list name="$selldecidedamounts" exact="$sellamount"/>
+												<append_to_list name="$selldecidedbuyers" exact="$sellbestbuyer"/>
+												<append_to_list name="$selldecidedbuyernames" exact="$sellbuyername"/>
+												<append_to_list name="$selldecidedprices" exact="$sellbestprice"/>
 												<set_value name="$sellremainingvolume" exact="$sellremainingvolume-($sellamount*$sellware.volume)"/>
 											</do_if>
 										</do_if>
@@ -388,21 +388,22 @@
 									</do_if>
 								</do_all>
 
-								<!-- Hold is as full as it's going to get this pass (or we ran out of sellable wares) - export everything to its buyer in one batch. -->
+								<!-- Every ware has been decided - now create every trade order back-to-back with no searching (and so no wait) in between, so a queued order can't cut this pass short before the rest are created. -->
 								<do_if value="$debugtrace">
-									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+' (Selling)'+': fill pass done, exporting '+$sellexportwares.count+' ware type(s) to their buyers ('+$sellremainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
+									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+' (Selling)'+': fill pass done deciding, committing '+$selldecidedwares.count+' ware type(s) to their buyers ('+$sellremainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 								</do_if>
-								<do_all exact="$sellexportwares.count" counter="$sd">
-									<create_trade_order name="$sellexportbuyers.{$sd}" object="this.object" tradeoffer="$sellexportbuyers.{$sd}" amount="$sellexportamounts.{$sd}" immediate="false"/>
+								<do_all exact="$selldecidedwares.count" counter="$sd">
+									<create_trade_order name="$selldecidedwares.{$sd}" object="this.object" tradeoffer="$selldecidedwares.{$sd}" amount="$selldecidedamounts.{$sd}" immediate="false"/>
+									<create_trade_order name="$selldecidedbuyers.{$sd}" object="this.object" tradeoffer="$selldecidedbuyers.{$sd}" amount="$selldecidedamounts.{$sd}" immediate="false"/>
 									<do_if value="$enablelogbook">
-										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$sellexportamounts.{$sd}*$sellexportprices.{$sd}" text="{8834271,302}.[$sellexportamounts.{$sd},$sellexportwares.{$sd},$sellexportbuyernames.{$sd},$sellexportprices.{$sd},$sellexportamounts.{$sd}*$sellexportprices.{$sd},$homestation.knownname]"/>
+										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$selldecidedamounts.{$sd}*$selldecidedprices.{$sd}" text="{8834271,302}.[$selldecidedamounts.{$sd},$selldecidedwares.{$sd}.ware,$selldecidedbuyernames.{$sd},$selldecidedprices.{$sd},$selldecidedamounts.{$sd}*$selldecidedprices.{$sd},$homestation.knownname]"/>
 									</do_if>
 								</do_all>
-								<remove_value name="$sellexportwares"/>
-								<remove_value name="$sellexportamounts"/>
-								<remove_value name="$sellexportbuyers"/>
-								<remove_value name="$sellexportbuyernames"/>
-								<remove_value name="$sellexportprices"/>
+								<remove_value name="$selldecidedwares"/>
+								<remove_value name="$selldecidedamounts"/>
+								<remove_value name="$selldecidedbuyers"/>
+								<remove_value name="$selldecidedbuyernames"/>
+								<remove_value name="$selldecidedprices"/>
 							</do_if>
 							<do_else>
 								<!-- Classic mode: pick up and immediately sell one ware at a time. -->
