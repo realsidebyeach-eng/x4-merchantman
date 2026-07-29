@@ -15,7 +15,7 @@
 - Classic mode (both buy and sell) is untouched — it already only handles one ware per pass by design and has no batching premise to protect.
 - The stray-cargo fallbacks, price-floor/ceiling decision logic, and storage-capacity checks (`$querybuyer.cargo.{...}.free`, version-18) are reused as-is — only *when* trade orders get created changes, not which ware/partner gets picked, at what price, or how amounts are capped.
 - No new param, no player-facing toggle.
-- Each decided ware now produces 2 trade orders (buy+deliver, or pickup+export) instead of the old code's implicit 1-at-a-time creation. The decision-phase loop guard must account for this so the ship's total order count (existing orders at pass start, plus 2 per decided ware) never reaches the 6-order ceiling the original `this.ship.tradeorders.count lt 6` guard was protecting — capture `this.ship.tradeorders.count` once before the decision loop starts (`$startingorders` / `$sellstartingorders`), then gate each further decision on `(($startingorders+($decidedwares.count*2)) lt 6)` (buy) / `(($sellstartingorders+($selldecidedwares.count*2)) lt 6)` (sell) instead of re-reading `this.ship.tradeorders.count` directly (which would stay 0 throughout the whole decision phase, since no orders exist yet to count, and would no longer cap anything).
+- Each decided ware now produces 2 trade orders (buy+deliver, or pickup+export) instead of the old code's implicit 1-at-a-time creation. The decision-phase loop guard must account for this so the ship's total order count (existing orders at pass start, plus 2 per decided ware) never *exceeds* 6 — capture `this.ship.tradeorders.count` once before the decision loop starts (`$startingorders` / `$sellstartingorders`), then gate each further decision on `(($startingorders+($decidedwares.count*2)) le 4)` (buy) / `(($sellstartingorders+($selldecidedwares.count*2)) le 4)` (sell) instead of re-reading `this.ship.tradeorders.count` directly (which would stay 0 throughout the whole decision phase, since no orders exist yet to count, and would no longer cap anything). Correction from final review: an initial `lt 6` version of this formula only correctly capped the ceiling for even starting counts — for an odd `$startingorders` it could let the ship reach 7 total orders. `le 4` (permit one more decision only if the current running total, `$startingorders+($decided*.count*2)`, is at most 4 — i.e. one more pair would bring it to at most 6) holds for every starting count, not just zero.
 - This is X4: Foundations aiscript XML — no unit-test framework exists; xmllint plus schema validation is the verification gate for the code tasks. In-game verification (Task 3) is load-bearing, not a formality — this fix rests on an unproven hypothesis about engine behavior, and the whole point of testing is to find out whether it's right.
 
 ---
@@ -691,18 +691,40 @@ tied to the `<wait>` calls the way this fix assumes, and the fallback
 approach (Classic-mode-style one-ware-per-pass with immediate delivery)
 needs to be designed instead.
 
-- [ ] **Step 4: Confirm no regression in single-ware passes**
+- [ ] **Step 4: Confirm the ship actually visits multiple sellers/buyers before returning home, not one round trip per ware**
+
+`committing N` greater than 1 on its own is not sufficient — the commit
+phase creates every buy/pickup order first, then every deliver/export
+order, specifically so the ship's resulting order queue is `buy(w1),
+buy(w2), buy(w3), deliver(w1), deliver(w2), deliver(w3)` (one filling tour,
+then one trip home), not `buy(w1), deliver(w1), buy(w2), deliver(w2), ...`
+(one round trip per ware). Watch the ship's actual flight path (or its
+order list in the X4 UI) for a `committing 2`+ pass: confirm it flies to
+each seller/buyer in turn and only returns to the home station once at the
+end, not after every individual ware.
+
+- [ ] **Step 5: Confirm the post-commit order-count line matches expectations**
+
+Check the new `'  commit done: ship now has N trade order(s) (expected
+M)'` debug line (buy) and its sell-side equivalent, logged right after
+each commit phase. `N` should equal `M`. If `N` is lower than `M`, a
+trade-offer object recorded during the decision phase went stale before
+the commit phase could use it (the known, accepted risk from the design
+spec's evidence trail) — report this back with the exact log line, since
+it means some decided wares silently failed to get an order at all.
+
+- [ ] **Step 6: Confirm no regression in single-ware passes**
 
 For a pass that only ever finds one viable ware (e.g. a station with only
 one wanted/sellable ware active), confirm it still behaves correctly —
 buys/sells that one ware and delivers/exports it — matching the fixed
 version-18 behavior for the single-ware case.
 
-- [ ] **Step 5: Confirm the order-count ceiling holds**
+- [ ] **Step 7: Confirm the order-count ceiling holds**
 
 Watch for any sign of the ship's order queue being over-filled (X4
 UI shows a ship's order list; it should never exceed 6 entries at once).
-If a ship with several wanted wares and no other orders queued reaches
-exactly 3 decided wares per pass (3 x 2 = 6 orders) and stops there rather
-than trying a 4th, that confirms the `$startingorders`/`$sellstartingorders`
-guard from Task 1/2 is working correctly.
+The guard formula (`(($startingorders+($decided*.count*2)) le 4)`)
+guarantees this for any starting order count, not just zero — for a ship
+starting this pass with 0 existing orders, it should decide exactly 3
+wares per pass (3 x 2 = 6 orders) and stop there rather than trying a 4th.

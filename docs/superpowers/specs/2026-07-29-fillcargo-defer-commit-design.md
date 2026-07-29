@@ -42,9 +42,15 @@ The working hypothesis, supported by multiple independent signals:
   more than one trade order per script cycle either — it evaluates every
   candidate, picks the single best deal, creates one order, and explicitly
   `<resume>`s elsewhere rather than looping back for a second.
-- The X4 script schema's own documentation of the `immediate` attribute on
-  `create_trade_order` describes order creation as inherently
-  interrupt-capable of the calling order.
+- Correction from final review: the `immediate` attribute's documented
+  interrupt behavior only applies when `immediate="true"` ("the order is
+  inserted as the current order... it will be interrupted"). Every
+  `create_trade_order` call in this file passes `immediate="false"`, where
+  the documented behavior is a plain queue append with no described effect
+  on the calling order. This schema text does not corroborate the
+  hypothesis the way this spec originally claimed — it neither confirms
+  nor rules it out. The hypothesis rests on the log evidence and the
+  TaterTrade precedent above, not on this attribute's documentation.
 
 Working theory: once a trade order is queued, the engine takes the next
 available script yield point (a `<wait>`) as its opportunity to switch the
