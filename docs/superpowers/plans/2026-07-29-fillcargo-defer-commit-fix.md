@@ -26,9 +26,9 @@
 - Modify: `aiscripts/sbe_stationtrader.xml`
 
 **Interfaces:**
-- Produces: `$decidedwares`, `$decidedamounts`, `$decidedsellers`, `$decidedsellernames`, `$decidedprices`, `$startingorders` — all scoped locally to this one `do_if value="$fillcargo"` block (buy pipeline), not consumed by Task 2 or by classic mode.
+- Produces: `$decidedwares`, `$decidedwarenames`, `$decidedamounts`, `$decidedsellers`, `$decidedsellernames`, `$decidedprices`, `$startingorders` — all scoped locally to this one `do_if value="$fillcargo"` block (buy pipeline), not consumed by Task 2 or by classic mode. `$decidedwarenames` captures the ware macro itself at decision time, separately from the offer object, so the commit phase's second loop never has to read `.ware` off an offer the first loop already consumed via `create_trade_order`.
 
-- [ ] **Step 1: Bump the aiscript version**
+- [x] **Step 1: Bump the aiscript version**
 
 In `aiscripts/sbe_stationtrader.xml`, find:
 
@@ -42,7 +42,7 @@ Replace with:
 <aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="19">
 ```
 
-- [ ] **Step 2: Replace the entire buy fill-cargo block**
+- [x] **Step 2: Replace the entire buy fill-cargo block**
 
 In `aiscripts/sbe_stationtrader.xml`, find this exact block (starts right after the `$processoffers`/balanced-mode setup, ends right before `<do_else>` which begins classic mode):
 
@@ -187,6 +187,7 @@ Replace with:
 						<do_if value="$fillcargo">
 							<!-- Fill-cargo mode: decide every wanted ware first (search freely, no trade orders yet), then create every trade order back-to-back at the end with no searching in between - creating a trade order appears to let the game engine take over the ship at the next search wait, so nothing after that point in the same pass would otherwise run. -->
 							<create_list name="$decidedwares"/>
+							<create_list name="$decidedwarenames"/>
 							<create_list name="$decidedamounts"/>
 							<create_list name="$decidedsellers"/>
 							<create_list name="$decidedsellernames"/>
@@ -200,7 +201,7 @@ Replace with:
 							</do_if>
 
 							<do_all exact="$processoffers.count" counter="$w">
-								<do_if value="(($startingorders+($decidedwares.count*2)) lt 6) and ($remainingvolume gt 0) and ($remainingbudget gt 0)">
+								<do_if value="(($startingorders+($decidedwares.count*2)) le 4) and ($remainingvolume gt 0) and ($remainingbudget gt 0)">
 									<set_value name="$wantedoffer" exact="$processoffers.{$w}"/>
 									<set_value name="$ware" exact="$wantedoffer.ware"/>
 
@@ -275,6 +276,7 @@ Replace with:
 										<do_if value="$amount gt 0">
 											<!-- Record the decision only - every trade order for this pass is created together in the commit phase below, after all searching is done. -->
 											<append_to_list name="$decidedwares" exact="$wantedoffer"/>
+											<append_to_list name="$decidedwarenames" exact="$ware"/>
 											<append_to_list name="$decidedamounts" exact="$amount"/>
 											<append_to_list name="$decidedsellers" exact="$bestseller"/>
 											<append_to_list name="$decidedsellernames" exact="$sellername"/>
@@ -296,25 +298,31 @@ Replace with:
 								</do_if>
 							</do_all>
 
-							<!-- Every ware has been decided - now create every trade order back-to-back with no searching (and so no wait) in between, so a queued order can't cut this pass short before the rest are created. -->
+							<!-- Every ware has been decided - now create every trade order back-to-back with no searching (and so no wait) in between, so a queued order can't cut this pass short before the rest are created. Buy legs first, then deliver legs, so the ship visits every seller before returning home once - pairing each ware's two legs together here would turn this back into one round trip per ware. -->
 							<do_if value="$debugtrace">
 								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': fill pass done deciding, committing '+$decidedwares.count+' ware type(s) home in one trip ('+$remainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 							</do_if>
 							<do_all exact="$decidedwares.count" counter="$d">
 								<create_trade_order name="$decidedsellers.{$d}" object="this.object" tradeoffer="$decidedsellers.{$d}" amount="$decidedamounts.{$d}" immediate="false"/>
-								<!-- Re-check live storage room right before delivering: an earlier ware in this same batch may have already used up shared capacity. Storage only, never money - this leg always executes at price="0". -->
-								<set_value name="$deliverclamped" exact="[$decidedamounts.{$d},$querybuyer.cargo.{$decidedwares.{$d}.ware}.free].min"/>
-								<create_trade_order name="$decidedwares.{$d}" object="this.object" tradeoffer="$decidedwares.{$d}" amount="$deliverclamped" price="0" immediate="false"/>
+							</do_all>
+							<do_all exact="$decidedwares.count" counter="$d2">
+								<!-- Clamp against the buyer's live storage room for this ware. Nothing executes between the queued orders in this loop, so this reads the same value for every ware in this batch - it does NOT yet account for two decided wares sharing the same storage pool within one pass (tracked as a known follow-up). Storage only, never money - this leg always executes at price="0". -->
+								<set_value name="$deliverclamped" exact="[$decidedamounts.{$d2},$querybuyer.cargo.{$decidedwarenames.{$d2}}.free].min"/>
+								<create_trade_order name="$decidedwares.{$d2}" object="this.object" tradeoffer="$decidedwares.{$d2}" amount="$deliverclamped" price="0" immediate="false"/>
 								<do_if value="$enablelogbook">
 									<do_if value="$isbuildstorage">
-										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$decidedamounts.{$d}*$decidedprices.{$d}" text="{8834271,301}.[$decidedamounts.{$d},$decidedwares.{$d}.ware,$decidedsellernames.{$d},$decidedprices.{$d},$decidedamounts.{$d}*$decidedprices.{$d},$homestation.knownname]"/>
+										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$decidedamounts.{$d2}*$decidedprices.{$d2}" text="{8834271,301}.[$decidedamounts.{$d2},$decidedwarenames.{$d2},$decidedsellernames.{$d2},$decidedprices.{$d2},$decidedamounts.{$d2}*$decidedprices.{$d2},$homestation.knownname]"/>
 									</do_if>
 									<do_else>
-										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$decidedamounts.{$d}*$decidedprices.{$d}" text="{8834271,300}.[$decidedamounts.{$d},$decidedwares.{$d}.ware,$decidedsellernames.{$d},$decidedprices.{$d},$decidedamounts.{$d}*$decidedprices.{$d},$homestation.knownname]"/>
+										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$decidedamounts.{$d2}*$decidedprices.{$d2}" text="{8834271,300}.[$decidedamounts.{$d2},$decidedwarenames.{$d2},$decidedsellernames.{$d2},$decidedprices.{$d2},$decidedamounts.{$d2}*$decidedprices.{$d2},$homestation.knownname]"/>
 									</do_else>
 								</do_if>
 							</do_all>
+							<do_if value="$debugtrace">
+								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  commit done: ship now has '+this.ship.tradeorders.count+' trade order(s) (expected '+($startingorders+($decidedwares.count*2))+').'" output="false" append="true" chance="100"/>
+							</do_if>
 							<remove_value name="$decidedwares"/>
+							<remove_value name="$decidedwarenames"/>
 							<remove_value name="$decidedamounts"/>
 							<remove_value name="$decidedsellers"/>
 							<remove_value name="$decidedsellernames"/>
@@ -322,7 +330,7 @@ Replace with:
 						</do_if>
 ```
 
-- [ ] **Step 3: Validate XML well-formedness**
+- [x] **Step 3: Validate XML well-formedness**
 
 Run:
 ```bash
@@ -330,7 +338,7 @@ xmllint --noout aiscripts/sbe_stationtrader.xml && echo VALID
 ```
 Expected: `VALID` printed, no errors.
 
-- [ ] **Step 4: Validate against the real X4 aiscript schema**
+- [x] **Step 4: Validate against the real X4 aiscript schema**
 
 Run:
 ```bash
@@ -338,14 +346,14 @@ xmllint --noout --schema /home/sidebyeach/Projects/X4SatelliteScout-worktree-imp
 ```
 Expected: `SCHEMA_VALID` printed, no errors. This restructuring changes deep nesting in a large block — schema validation (not just well-formedness) is the real gate here, not optional.
 
-- [ ] **Step 5: Verify no dangling references to the old list names**
+- [x] **Step 5: Verify no dangling references to the old list names**
 
 ```bash
 grep -c '\$deliverwares\|\$deliveramounts\|\$deliversellers' aiscripts/sbe_stationtrader.xml
 ```
 Expected: `0` — the old buy-side batch lists (`$deliverwares`, `$deliveramounts`, `$deliversellers`) no longer exist anywhere in the file. (Note: `$deliverclamped` is a different, still-used variable name — it is not part of this grep pattern and should still appear once in the new commit-phase code.)
 
-- [ ] **Step 6: Verify the new decision/commit structure is in place**
+- [x] **Step 6: Verify the new decision/commit structure is in place**
 
 ```bash
 grep -c '\$decidedwares\|\$decidedamounts\|\$decidedsellers\|\$decidedsellernames\|\$decidedprices' aiscripts/sbe_stationtrader.xml
@@ -353,7 +361,7 @@ grep -n 'startingorders' aiscripts/sbe_stationtrader.xml
 ```
 Expected: the first command shows a positive count (each name appears multiple times: `create_list`, at least one `append_to_list`/read, and `remove_value`). The second command shows two matches — `$startingorders` (buy pipeline, set once and used in the decision-loop guard) — Task 2 will add the sell-side `$sellstartingorders` separately, so only the buy-side name should appear after this task.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add aiscripts/sbe_stationtrader.xml
@@ -368,9 +376,9 @@ git commit -m "fix: defer buy fill-cargo trade orders to a single no-wait commit
 - Modify: `aiscripts/sbe_stationtrader.xml`
 
 **Interfaces:**
-- Produces: `$selldecidedwares`, `$selldecidedamounts`, `$selldecidedbuyers`, `$selldecidedbuyernames`, `$selldecidedprices`, `$sellstartingorders` — all scoped locally to this one `do_if value="$fillcargo"` block (sell pipeline), not consumed by Task 1 or by classic mode.
+- Produces: `$selldecidedwares`, `$selldecidedwarenames`, `$selldecidedamounts`, `$selldecidedbuyers`, `$selldecidedbuyernames`, `$selldecidedprices`, `$sellstartingorders` — all scoped locally to this one `do_if value="$fillcargo"` block (sell pipeline), not consumed by Task 1 or by classic mode. `$selldecidedwarenames` captures the ware macro itself at decision time, separately from the offer object, so the commit phase's second loop never has to read `.ware` off an offer the first loop already consumed via `create_trade_order`.
 
-- [ ] **Step 1: Replace the entire sell fill-cargo block**
+- [x] **Step 1: Replace the entire sell fill-cargo block**
 
 In `aiscripts/sbe_stationtrader.xml`, find this exact block (starts right after the Selling section's `$sellprocessoffers`/balanced-mode setup, ends right before `<do_else>` which begins Selling's classic mode):
 
@@ -496,6 +504,7 @@ Replace with:
 							<do_if value="$fillcargo">
 								<!-- Fill-cargo mode for selling: decide every sellable ware first (search freely, no trade orders yet), then create every trade order back-to-back at the end with no searching in between - creating a trade order appears to let the game engine take over the ship at the next search wait, so nothing after that point in the same pass would otherwise run. -->
 								<create_list name="$selldecidedwares"/>
+								<create_list name="$selldecidedwarenames"/>
 								<create_list name="$selldecidedamounts"/>
 								<create_list name="$selldecidedbuyers"/>
 								<create_list name="$selldecidedbuyernames"/>
@@ -508,7 +517,7 @@ Replace with:
 								</do_if>
 
 								<do_all exact="$sellprocessoffers.count" counter="$sw">
-									<do_if value="(($sellstartingorders+($selldecidedwares.count*2)) lt 6) and ($sellremainingvolume gt 0)">
+									<do_if value="(($sellstartingorders+($selldecidedwares.count*2)) le 4) and ($sellremainingvolume gt 0)">
 										<set_value name="$sellwantedoffer" exact="$sellprocessoffers.{$sw}"/>
 										<set_value name="$sellware" exact="$sellwantedoffer.ware"/>
 
@@ -570,6 +579,7 @@ Replace with:
 											<do_if value="$sellamount gt 0">
 												<!-- Record the decision only - every trade order for this pass is created together in the commit phase below, after all searching is done. -->
 												<append_to_list name="$selldecidedwares" exact="$sellwantedoffer"/>
+												<append_to_list name="$selldecidedwarenames" exact="$sellware"/>
 												<append_to_list name="$selldecidedamounts" exact="$sellamount"/>
 												<append_to_list name="$selldecidedbuyers" exact="$sellbestbuyer"/>
 												<append_to_list name="$selldecidedbuyernames" exact="$sellbuyername"/>
@@ -590,18 +600,24 @@ Replace with:
 									</do_if>
 								</do_all>
 
-								<!-- Every ware has been decided - now create every trade order back-to-back with no searching (and so no wait) in between, so a queued order can't cut this pass short before the rest are created. -->
+								<!-- Every ware has been decided - now create every trade order back-to-back with no searching (and so no wait) in between, so a queued order can't cut this pass short before the rest are created. Pickup legs first, then export legs, so the ship visits every buyer before returning home once - pairing each ware's two legs together here would turn this back into one round trip per ware. -->
 								<do_if value="$debugtrace">
 									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+' (Selling)'+': fill pass done deciding, committing '+$selldecidedwares.count+' ware type(s) to their buyers ('+$sellremainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 								</do_if>
 								<do_all exact="$selldecidedwares.count" counter="$sd">
 									<create_trade_order name="$selldecidedwares.{$sd}" object="this.object" tradeoffer="$selldecidedwares.{$sd}" amount="$selldecidedamounts.{$sd}" immediate="false"/>
-									<create_trade_order name="$selldecidedbuyers.{$sd}" object="this.object" tradeoffer="$selldecidedbuyers.{$sd}" amount="$selldecidedamounts.{$sd}" immediate="false"/>
+								</do_all>
+								<do_all exact="$selldecidedwares.count" counter="$sd2">
+									<create_trade_order name="$selldecidedbuyers.{$sd2}" object="this.object" tradeoffer="$selldecidedbuyers.{$sd2}" amount="$selldecidedamounts.{$sd2}" immediate="false"/>
 									<do_if value="$enablelogbook">
-										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$selldecidedamounts.{$sd}*$selldecidedprices.{$sd}" text="{8834271,302}.[$selldecidedamounts.{$sd},$selldecidedwares.{$sd}.ware,$selldecidedbuyernames.{$sd},$selldecidedprices.{$sd},$selldecidedamounts.{$sd}*$selldecidedprices.{$sd},$homestation.knownname]"/>
+										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$selldecidedamounts.{$sd2}*$selldecidedprices.{$sd2}" text="{8834271,302}.[$selldecidedamounts.{$sd2},$selldecidedwarenames.{$sd2},$selldecidedbuyernames.{$sd2},$selldecidedprices.{$sd2},$selldecidedamounts.{$sd2}*$selldecidedprices.{$sd2},$homestation.knownname]"/>
 									</do_if>
 								</do_all>
+								<do_if value="$debugtrace">
+									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="'  commit done: ship now has '+this.ship.tradeorders.count+' trade order(s) (expected '+($sellstartingorders+($selldecidedwares.count*2))+').'" output="false" append="true" chance="100"/>
+								</do_if>
 								<remove_value name="$selldecidedwares"/>
+								<remove_value name="$selldecidedwarenames"/>
 								<remove_value name="$selldecidedamounts"/>
 								<remove_value name="$selldecidedbuyers"/>
 								<remove_value name="$selldecidedbuyernames"/>
@@ -609,7 +625,7 @@ Replace with:
 							</do_if>
 ```
 
-- [ ] **Step 2: Validate XML well-formedness**
+- [x] **Step 2: Validate XML well-formedness**
 
 Run:
 ```bash
@@ -617,7 +633,7 @@ xmllint --noout aiscripts/sbe_stationtrader.xml && echo VALID
 ```
 Expected: `VALID` printed, no errors.
 
-- [ ] **Step 3: Validate against the real X4 aiscript schema**
+- [x] **Step 3: Validate against the real X4 aiscript schema**
 
 Run:
 ```bash
@@ -625,14 +641,14 @@ xmllint --noout --schema /home/sidebyeach/Projects/X4SatelliteScout-worktree-imp
 ```
 Expected: `SCHEMA_VALID` printed, no errors.
 
-- [ ] **Step 4: Verify no dangling references to the old list names**
+- [x] **Step 4: Verify no dangling references to the old list names**
 
 ```bash
 grep -c '\$sellexportwares\|\$sellexportamounts\|\$sellexportbuyers\|\$sellexportbuyernames\|\$sellexportprices' aiscripts/sbe_stationtrader.xml
 ```
 Expected: `0` — the old sell-side batch lists no longer exist anywhere in the file.
 
-- [ ] **Step 5: Verify the new decision/commit structure is in place**
+- [x] **Step 5: Verify the new decision/commit structure is in place**
 
 ```bash
 grep -c '\$selldecidedwares\|\$selldecidedamounts\|\$selldecidedbuyers\|\$selldecidedbuyernames\|\$selldecidedprices' aiscripts/sbe_stationtrader.xml
@@ -640,7 +656,7 @@ grep -n 'startingorders' aiscripts/sbe_stationtrader.xml
 ```
 Expected: the first command shows a positive count. The second command now shows two matches total across the whole file — `$startingorders` (buy, from Task 1) and `$sellstartingorders` (sell, from this task) — confirming both pipelines' guards are in place and distinctly named.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add aiscripts/sbe_stationtrader.xml
@@ -702,6 +718,16 @@ then one trip home), not `buy(w1), deliver(w1), buy(w2), deliver(w2), ...`
 order list in the X4 UI) for a `committing 2`+ pass: confirm it flies to
 each seller/buyer in turn and only returns to the home station once at the
 end, not after every individual ware.
+
+Also specifically watch a `committing 2`+ buy-side pass for a **known,
+pre-existing gap**: the deliver leg's storage clamp reads the buyer's live
+free space fresh for every decided ware, but nothing executes between the
+queued orders in the commit phase, so it reads the *same* value each time
+— it does not account for two decided wares sharing the same storage pool
+within one pass. If a later ware's home delivery in a multi-ware pass
+comes up short and leaves stray cargo, that's this known gap surfacing
+now that fill-cargo can act on more than one ware — not a new regression.
+See the design spec's "Known follow-up" section for the fix shape.
 
 - [ ] **Step 5: Confirm the post-commit order-count line matches expectations**
 

@@ -79,10 +79,21 @@ the amount, the price, the partner's name) into a list — the same
 defer-into-a-list pattern this file already uses for the second leg today.
 
 **Commit phase** (new): once every ware has been decided, walk the
-recorded decisions and create every trade order for every ware — both
-legs, back to back — with no search, and therefore no `<wait>`, anywhere
-in this phase. If the interrupt really is tied to hitting a `<wait>` after
-a trade order exists, this phase never gives it the opportunity.
+recorded decisions and create every trade order for every ware, in **two
+separate passes** — every first-leg order for every ware, then every
+second-leg order for every ware — with no search, and therefore no
+`<wait>`, anywhere in this phase. If the interrupt really is tied to
+hitting a `<wait>` after a trade order exists, this phase never gives it
+the opportunity.
+
+Correction from final review: an earlier version of this design paired
+each ware's two legs immediately adjacent to each other in a single loop
+(leg1(w1), leg2(w1), leg1(w2), leg2(w2), ...). Since `create_trade_order`
+appends to the ship's order queue in creation order, that produces one
+round trip per ware — fly to partner1, back home, to partner2, back home
+again — which defeats the entire point of this fix. The two-pass split
+(leg1(w1)...leg1(wN), then leg2(w1)...leg2(wN)) produces the actually
+intended queue: one tour visiting every partner, then one trip home.
 
 Applies to both pipelines:
 
@@ -91,15 +102,25 @@ Applies to both pipelines:
   line 676) into a new list (the seller offer object itself, since the
   commit phase needs a live reference to create the order against) instead
   of creating it inside the decision loop. The deliver leg (currently
-  created in the existing final batch loop, line 705) is unchanged in
-  behavior — it already lives in the commit phase, it just now runs
-  immediately after the buy leg for the same ware instead of after a
-  separately-tracked batch.
+  created in the existing final batch loop, line 705) moves into its own
+  second commit-phase loop, run only after every buy leg for every decided
+  ware has already been created.
 - **Sell fill-cargo** (`aiscripts/sbe_stationtrader.xml:294-406`
   currently): defer the pickup leg (`create_trade_order
   name="$sellwantedoffer"...`, currently line 369) the same way. The
-  export leg (currently line 396) is likewise already a commit-phase
-  action, just now paired immediately with its pickup leg.
+  export leg (currently line 396) likewise moves into its own second
+  commit-phase loop, run only after every pickup leg for every decided
+  ware has already been created.
+
+Both pipelines also capture the ware macro itself (not just the offer
+object) into a dedicated list at decision time (`$decidedwarenames`
+buy-side, `$selldecidedwarenames` sell-side). The second commit-phase loop
+needs the ware for its Logbook entry and (buy-side) its storage clamp, but
+by then the first loop has already consumed the offer object via
+`create_trade_order` — reading `.ware` off it at that point would be this
+file's recurring read-after-consumption bug (already fixed twice
+elsewhere in its history). Capturing the ware separately, before any
+consumption, avoids a third instance.
 
 Classic mode (both buy and sell) is untouched — it already only handles
 one ware per pass by design and has no batching premise to protect.
@@ -145,6 +166,36 @@ change:
 - The classic-mode fallback redesign (Option B from the design
   discussion) — only pursued if this fix's in-game verification shows the
   hypothesis was wrong.
+
+## Known follow-up (flagged by final review, not fixed here)
+
+The buy-side deliver leg's storage clamp
+(`$querybuyer.cargo.{$decidedwarenames.{$d2}}.free`) is re-evaluated once
+per decided ware in the commit phase's second loop, but nothing executes
+between the queued orders in that loop — so it reads the *same* live
+storage figure for every ware, never accounting for an earlier ware in
+the same batch also being delivered to the same shared storage pool. If
+two decided wares in one pass share a storage type and together exceed
+the buyer's real free space, both get clamped independently against the
+same (stale-by-the-second-ware) number, and the second delivery can be
+short — landing the excess back on the stray-cargo fallback. This was
+unreachable before this fix (fill-cargo capped at one ware per pass) and
+is a direct instance of this spec's own Problem #1 ("only delivers a
+small percentage... the rest sits as stray cargo"), now reachable via a
+different path than the one this fix closes.
+
+Not fixed in this branch — the storage-capacity check's own logic is
+explicitly reused as-is per this spec's Scope section. The right shape for
+a follow-up is a running decrement in the decision phase, mirroring how
+`$remainingvolume`/`$remainingbudget` already track consumption across
+wares in the same pass: seed a `$querybuyerfree` scalar once from
+`$querybuyer.cargo.{...}.free` per storage type, subtract each accepted
+`$amount` as it's decided, and clamp against that running value instead
+of a fresh (and, within one pass, unchanging) read. Task 3's in-game
+verification should watch specifically for this symptom (a `committing
+2`+ pass where a later ware's home delivery comes up short) so it isn't
+mistaken for a new regression when it's actually this known, pre-existing
+gap.
 
 ## Versioning
 
