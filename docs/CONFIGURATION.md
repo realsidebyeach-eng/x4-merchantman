@@ -14,6 +14,7 @@ parameters below.
 | **Ware Priority List** | ware list | empty | The wares this ship is allowed to manage, and (in Priority mode) the order to handle them in — applies to both buying and selling. **Leave empty to auto-manage every ware the station currently wants to buy and/or sell** — see below. If you list specific wares, only those are ever bought/sold, even if the station has demand or surplus elsewhere. |
 | **Balanced Mode** | on/off | off | Off = **Priority mode**. On = **Balanced mode**. See below. |
 | **Fill Cargo Before Returning** | on/off | on | On = buy and/or sell (per whichever roles are enabled) from every wanted/sellable ware first, tracking remaining cargo space (and credits, for buying) as it goes, then deliver/export everything home or to buyers in one trip once the hold is full or nothing more is available/affordable. Off = classic mode, buy or sell and immediately deliver/export one ware at a time. See below. |
+| **Min Free Cargo % to Chase Another Stop** | 0–95 | 10 | Buy-side Fill Cargo Before Returning only. Once free cargo space drops below this percent of the ship's total capacity, buy-fill stops searching for another wanted ware/seller and delivers with whatever's already queued instead of chasing one more stop. Ignored when Fill Cargo Before Returning is off, and has no equivalent on the selling side. See below. |
 | **Also Resupply Build Storage** | on/off | on | On = also buy construction wares a home station's Build Storage currently wants (station under construction or having a module added), same as normal production wares. Off = Build Storage is ignored entirely. See [Build Storage](#build-storage-construction-wares) below. |
 | **Build Storage First** | on/off | on | Used only when Also Resupply Build Storage is on. On = Build Storage's wanted wares are fully serviced before the station's own production-wanted wares each pass. Off = production wares first. |
 | **Max Jump Range** | 0–10 | 3 | How many jumps from a home station's own sector to search for a seller. 0 = the home station's own sector only. |
@@ -109,6 +110,15 @@ over the price floor), the credit budget runs out (buying only), or the
 hold physically fills up. This means fewer separate round trips overall —
 the ship gathers or exports several wares in one outing instead of
 shuttling back and forth for each ware individually.
+
+On the buying side only, **Min Free Cargo % to Chase Another Stop** adds
+an early-exit condition: once free cargo space drops below this percent
+of the ship's total capacity, buy-fill stops considering further wanted
+wares for the rest of that pass, even if more demand and cargo space
+technically remain. This avoids sending the ship on a whole extra
+detour just to top off the last sliver of a nearly-full hold. It has no
+effect in classic mode (which only ever considers one ware per pass
+anyway) and no equivalent on the selling side.
 
 **Classic mode** (Fill Cargo Before Returning = off): the original
 behavior — for each wanted/sellable ware, buy or sell it and immediately
