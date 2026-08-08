@@ -103,22 +103,33 @@ with Enable Selling on, picks up for export) from every wanted/sellable
 ware it can find a valid deal for — tracking a running "how much cargo
 space is left" (and, for buying, "how many credits are left") as it goes —
 and only queues the delivery/export trade orders at the very end, once the
-hold is as full as it's going to get this pass. It only "returns short"
-(delivers/exports less than a full hold) when there genuinely isn't enough
-available: no more wares have a seller under the price ceiling (or buyer
-over the price floor), the credit budget runs out (buying only), or the
-hold physically fills up. This means fewer separate round trips overall —
-the ship gathers or exports several wares in one outing instead of
-shuttling back and forth for each ware individually.
+hold is as full as it's going to get this pass. Beyond running out of
+wares to consider, it also "returns short" (delivers/exports less than a
+full hold) when there genuinely isn't enough available: no more wares have
+a seller under the price ceiling (or buyer over the price floor), the
+credit budget runs out (buying only), or the hold physically fills up
+— see **Min Free Cargo % to Chase Another Stop** below for one more early-exit
+condition on the buying side. This means fewer separate round trips
+overall — the ship gathers or exports several wares in one outing instead
+of shuttling back and forth for each ware individually.
 
 On the buying side only, **Min Free Cargo % to Chase Another Stop** adds
 an early-exit condition: once free cargo space drops below this percent
 of the ship's total capacity, buy-fill stops considering further wanted
 wares for the rest of that pass, even if more demand and cargo space
 technically remain. This avoids sending the ship on a whole extra
-detour just to top off the last sliver of a nearly-full hold. It has no
-effect in classic mode (which only ever considers one ware per pass
-anyway) and no equivalent on the selling side.
+detour just to top off the last sliver of a nearly-full hold. If a pass
+*starts* already below the threshold (e.g. the hold was already mostly
+full from a previous pass), buy-fill skips considering any wanted wares
+that pass, not just additional ones — at a high setting (e.g. 80%) this
+can look like the ship has stopped working if you don't know the
+threshold is gating it. Any cargo the ship is already carrying isn't
+stranded when this happens: the stray-cargo offload logic near the top of
+the ship's main loop (before the buy/sell phases run) still tries to
+deliver or sell cargo that isn't tied to a pending trade order every
+pass, whether or not buy-fill ran that pass. It has no effect in classic
+mode (which only ever considers one ware per pass anyway) and no
+equivalent on the selling side.
 
 **Classic mode** (Fill Cargo Before Returning = off): the original
 behavior — for each wanted/sellable ware, buy or sell it and immediately

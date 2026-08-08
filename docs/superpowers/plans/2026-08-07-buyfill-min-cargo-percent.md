@@ -353,6 +353,10 @@ around the new `set_value` calls.
    pass start).
 
 Expected: the debug log shows the pass-start line printing
-`$remainingvolume` already below `$mincargovolume`, and no `fill pass done
-deciding` line follows for that category that pass — buy-fill was skipped
-entirely, per the agreed "gate from the first ware onward" design.
+`$remainingvolume` already below `$mincargovolume`, and the `fill pass done
+deciding, committing N ware type(s)` line that follows reports **0 ware
+type(s)** committed for that category that pass — buy-fill was skipped
+entirely, per the agreed "gate from the first ware onward" design. (That
+line always prints when `$fillcargo` is on; it sits outside the decision
+loop, so it will not be absent — the tell is the `0` count, not a missing
+line.)

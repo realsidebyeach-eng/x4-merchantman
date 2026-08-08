@@ -617,7 +617,7 @@
 							<set_value name="$seedware" exact="$processoffers.{1}.ware"/>
 							<set_value name="$remainingvolume" exact="this.ship.cargo.{$seedware}.free * $seedware.volume"/>
 							<set_value name="$cargocapacity" exact="this.ship.cargo.{$seedware}.max"/>
-							<set_value name="$mincargovolume" exact="$cargocapacity*$mincargopercent/100"/>
+							<set_value name="$mincargovolume" exact="[$cargocapacity*$mincargopercent/100,1].max"/>
 							<set_value name="$remainingbudget" exact="player.money/100"/>
 							<set_value name="$startingorders" exact="this.ship.tradeorders.count"/>
 							<do_if value="$debugtrace">
