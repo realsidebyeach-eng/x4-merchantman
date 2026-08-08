@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Station Trader Assignments, by sidebyeach. -->
 <!-- Restocks one or more assigned home stations: buys the wares they currently want from the cheapest accessible seller, and/or sells their production surplus to the best-paying accessible buyer, within a configurable jump range. -->
-<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="19">
+<aiscript name="sbe_stationtrader" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="aiscripts.xsd" version="20">
 	<order id="SBEStationTrader" name="{8834271,500}" description="{8834271,501}" category="trade" infinite="true" allowinloop="false">
 		<params>
 			<!-- One or more stations this ship restocks. -->
@@ -22,6 +22,13 @@
 			<param name="balanced" default="false" type="bool" text="{8834271,103}" comment="Spread purchases evenly across wares instead of strict priority."/>
 			<!-- true: buy from every wanted ware until the hold is full (or nothing more is available/affordable), then deliver everything home in one go. false: classic immediate buy-then-deliver, one ware at a time. -->
 			<param name="fillcargo" default="true" type="bool" text="{8834271,112}" comment="Fill the cargo hold across all wanted wares before returning home to deliver."/>
+			<!-- Buy-side fill-cargo only: once free cargo space (relative to total capacity for the wanted ware's cargo class) drops below this percent, stop searching for another wanted ware to fill the rest of the hold - deliver/return with what's already queued instead of chasing one more stop. Ignored when fillcargo is off. -->
+			<param name="mincargopercent" default="10" type="number" text="{8834271,117}" comment="Stop chasing additional stops once free cargo space drops below this percent of total capacity (buy-side fill-cargo only; ignored when Fill Cargo is off).">
+				<input_param name="startvalue" value="10"/>
+				<input_param name="min" value="0"/>
+				<input_param name="max" value="95"/>
+				<input_param name="step" value="1"/>
+			</param>
 			<!-- true: also resupply a home station's Build Storage (construction-phase demand for a station under construction or having a module added) alongside its normal production buy offers. -->
 			<param name="manageconstruction" default="true" type="bool" text="{8834271,113}" comment="Also resupply Build Storage (construction wares) for stations under construction/expansion."/>
 			<!-- true: service Build Storage's wanted wares before the station's own production-wanted wares each pass, when both have demand this pass. false: production wares first. -->
@@ -113,6 +120,11 @@
 		</do_if>
 		<do_if value="$enableselling == null">
 			<set_value name="$enableselling" exact="true"/>
+		</do_if>
+	</patch>
+	<patch sinceversion="20">
+		<do_if value="$mincargopercent == null">
+			<set_value name="$mincargopercent" exact="10"/>
 		</do_if>
 	</patch>
 	<attention min="unknown">
