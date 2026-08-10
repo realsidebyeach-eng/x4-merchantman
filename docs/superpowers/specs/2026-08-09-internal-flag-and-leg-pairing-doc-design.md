@@ -180,10 +180,13 @@ documentation only.
 
 ## Rollout
 
-Version bump: `19` → `20` (root `<aiscript ... version="N">`). No
-`<patch sinceversion="20">` upgrade block needed — precedent from v16-19
-(storage-clamp/scope fixes, also pure internal-logic changes with no
-param/structural changes) shows attribute-only or logic-only changes
-don't require one; only param-structure changes have historically needed
-a patch block (see existing blocks at versions 2,3,4,8,11,12).
-`content.xml`'s version stays at `1` per established convention.
+Version bump: `20` → `21` (root `<aiscript ... version="N">`). Updated
+from this spec's original `19` → `20` after merging `main`, which had
+independently shipped the `mincargopercent` feature at version `20` in
+the meantime — `20` is no longer available. No `<patch sinceversion="21">`
+upgrade block needed — precedent from v16-19 (storage-clamp/scope fixes,
+also pure internal-logic changes with no param/structural changes) shows
+attribute-only or logic-only changes don't require one; only
+param-structure changes have historically needed a patch block (see
+existing blocks at versions 2,3,4,8,11,12,20). `content.xml`'s version
+stays at `1` per established convention.
