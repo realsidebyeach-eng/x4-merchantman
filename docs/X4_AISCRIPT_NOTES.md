@@ -103,6 +103,52 @@ was actually created/queued successfully in the same pass. Don't design
 logic that assumes you can check the outcome of a `create_trade_order`
 call.
 
+### Multi-ware fill-cargo passes don't get the engine's automatic leg-pairing safety net
+
+`order.trade.perform.xml` — the executor order every `create_trade_order`
+call actually queues, regardless of who created it — contains a generic,
+queue-position-based mechanism (`order.trade.perform.xml:558-566`) that
+auto-cancels a failed leg's immediate successor order if it looks like
+the other half of a buy/sell pair:
+
+```xml
+<!-- if this is the buy of a buy-sell pair,
+      and it failed,
+      and we have none of the ware needed for the sell,
+      cancel the sell. -->
+<do_if value="(@this.assignedcontrolled.nextorder.id == 'TradePerform')
+              and @this.assignedcontrolled.nextorder.$tradedeal.buyer.exists
+              and not this.assignedcontrolled.cargo.{$tradedeal.ware}.exists">
+  <cancel_order order="this.assignedcontrolled.nextorder"/>
+</do_if>
+```
+
+This checks whether the ship's own *very next queued order* is also a
+`TradePerform` order — purely positional, not gated by `internal=`, and
+not dependent on which script created either order. **This mod's
+single-ware passes (classic mode, or a fill-cargo pass that only decided
+one ware) already get this protection automatically, for free, with no
+code change** — the buy/pickup leg and the deliver/export leg end up
+adjacent in the ship's queue in that case.
+
+**Multi-ware fill-cargo passes do not get this protection.** This mod's
+v19 fill-cargo commit phase deliberately uses two separate loops — every
+first-leg order for every decided ware, then every second-leg order for
+every decided ware (`aiscripts/sbe_stationtrader.xml`, both the buy and
+sell commit phases) — specifically to avoid producing one round trip per
+ware (see `project_create_trade_order_wait_interrupt` memory / `docs/KNOWN_ISSUES.md`
+Pattern Class 5). For N ≥ 2 decided wares, the queue order is `leg1(w1),
+leg1(w2), ..., leg1(wN), leg2(w1), ..., leg2(wN)` — `leg1(w1)`'s
+`nextorder` is `leg1(w2)`, not `leg2(w1)`, so the adjacency check never
+matches.
+
+**This is an accepted tradeoff, not a bug to fix.** Restoring adjacency
+to regain this protection would reintroduce the exact one-round-trip-per-
+ware bug the v19 fix corrected. No confirmed real-world evidence exists
+of a leg actually failing and stranding its paired leg in a multi-ware
+pass — see `docs/superpowers/specs/2026-08-09-internal-flag-and-leg-pairing-doc-design.md`
+for the full design reasoning.
+
 ## `clamp_trade_amount`
 
 **Schema** (`common.xsd:21988`):
