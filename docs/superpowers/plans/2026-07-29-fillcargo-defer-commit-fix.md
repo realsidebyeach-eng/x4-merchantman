@@ -303,12 +303,12 @@ Replace with:
 								<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+$categorylabel+': fill pass done deciding, committing '+$decidedwares.count+' ware type(s) home in one trip ('+$remainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 							</do_if>
 							<do_all exact="$decidedwares.count" counter="$d">
-								<create_trade_order name="$decidedsellers.{$d}" object="this.object" tradeoffer="$decidedsellers.{$d}" amount="$decidedamounts.{$d}" immediate="false"/>
+								<create_trade_order name="$decidedsellers.{$d}" object="this.object" tradeoffer="$decidedsellers.{$d}" amount="$decidedamounts.{$d}" immediate="false" internal="true"/>
 							</do_all>
 							<do_all exact="$decidedwares.count" counter="$d2">
 								<!-- Clamp against the buyer's live storage room for this ware. Nothing executes between the queued orders in this loop, so this reads the same value for every ware in this batch - it does NOT yet account for two decided wares sharing the same storage pool within one pass (tracked as a known follow-up). Storage only, never money - this leg always executes at price="0". -->
 								<set_value name="$deliverclamped" exact="[$decidedamounts.{$d2},$querybuyer.cargo.{$decidedwarenames.{$d2}}.free].min"/>
-								<create_trade_order name="$decidedwares.{$d2}" object="this.object" tradeoffer="$decidedwares.{$d2}" amount="$deliverclamped" price="0" immediate="false"/>
+								<create_trade_order name="$decidedwares.{$d2}" object="this.object" tradeoffer="$decidedwares.{$d2}" amount="$deliverclamped" price="0" immediate="false" internal="true"/>
 								<do_if value="$enablelogbook">
 									<do_if value="$isbuildstorage">
 										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$decidedamounts.{$d2}*$decidedprices.{$d2}" text="{8834271,301}.[$decidedamounts.{$d2},$decidedwarenames.{$d2},$decidedsellernames.{$d2},$decidedprices.{$d2},$decidedamounts.{$d2}*$decidedprices.{$d2},$homestation.knownname]"/>
@@ -605,10 +605,10 @@ Replace with:
 									<debug_to_file name="this.ship.idcode" directory="'StationTrader'" text="$homestation.knownname+' (Selling)'+': fill pass done deciding, committing '+$selldecidedwares.count+' ware type(s) to their buyers ('+$sellremainingvolume+'m3 still free).'" output="false" append="true" chance="100"/>
 								</do_if>
 								<do_all exact="$selldecidedwares.count" counter="$sd">
-									<create_trade_order name="$selldecidedwares.{$sd}" object="this.object" tradeoffer="$selldecidedwares.{$sd}" amount="$selldecidedamounts.{$sd}" immediate="false"/>
+									<create_trade_order name="$selldecidedwares.{$sd}" object="this.object" tradeoffer="$selldecidedwares.{$sd}" amount="$selldecidedamounts.{$sd}" immediate="false" internal="true"/>
 								</do_all>
 								<do_all exact="$selldecidedwares.count" counter="$sd2">
-									<create_trade_order name="$selldecidedbuyers.{$sd2}" object="this.object" tradeoffer="$selldecidedbuyers.{$sd2}" amount="$selldecidedamounts.{$sd2}" immediate="false"/>
+									<create_trade_order name="$selldecidedbuyers.{$sd2}" object="this.object" tradeoffer="$selldecidedbuyers.{$sd2}" amount="$selldecidedamounts.{$sd2}" immediate="false" internal="true"/>
 									<do_if value="$enablelogbook">
 										<write_to_logbook category="upkeep" title="'Station Trader: '+this.ship.knownname+' ( '+this.ship.idcode+' )'" interaction="showonmap" object="this.ship" money="$selldecidedamounts.{$sd2}*$selldecidedprices.{$sd2}" text="{8834271,302}.[$selldecidedamounts.{$sd2},$selldecidedwarenames.{$sd2},$selldecidedbuyernames.{$sd2},$selldecidedprices.{$sd2},$selldecidedamounts.{$sd2}*$selldecidedprices.{$sd2},$homestation.knownname]"/>
 									</do_if>

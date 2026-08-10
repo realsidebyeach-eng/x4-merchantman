@@ -230,7 +230,10 @@ touching the related code.
   v19's two-pass commit ordering breaks for multi-ware passes (by design
   — restoring adjacency would reintroduce the Class 5 bug). No confirmed
   real-world instance of this actually stranding a leg; not being built
-  speculatively. See `specs/2026-08-09-internal-flag-and-leg-pairing-doc-design.md`.
+  speculatively. See
+  `specs/2026-08-09-internal-flag-and-leg-pairing-doc-design.md` and
+  `docs/X4_AISCRIPT_NOTES.md`'s "Multi-ware fill-cargo passes don't get
+  the engine's automatic leg-pairing safety net" subsection.
 - **Stray-cargo priority (home-first vs. external-buyer-first) was
   designed but never merged.** A separate, orphaned branch
   (`worktree-stray-buyer-null-name`) designed swapping stray-cargo
@@ -250,6 +253,21 @@ touching the related code.
   no route-safety/avoidance action exists anywhere in the X4 aiscript
   schema. Documented in `README.md`; the only mitigation is lowering Max
   Jump Range. See `specs/2026-07-24-stray-buyer-null-name-and-blacklist-doc.md`.
+- **Home-station delivery legs are now blacklist-screened, and can
+  silently abort.** Adding `internal="true"` to every `create_trade_order`
+  call (2026-08-09/10) made the engine's own `$internalorder`-gated
+  blacklist check (`order.trade.perform.xml:156,300`,
+  `TRADEPARTNER_BLACKLISTED`) live for every leg, including deliveries to
+  a ship's own home station — previously unscreened, since this mod's own
+  upstream checks (`match_use_blacklist`/sector `isblacklisted`) only ever
+  screen external search-space partners, not the user's own explicit
+  home-station selection. **Accepted as intentional**: honoring the
+  player's own blacklist against their own station is defensible default
+  behavior. If a player blacklists a sector containing one of their own
+  home stations, delivery legs to that station will now silently abort
+  and the ship falls back to stray-cargo handling instead. See
+  `docs/X4_AISCRIPT_NOTES.md`'s "What `internal=\"true\"` actually does"
+  subsection for the full mechanism.
 
 ## Singletons
 

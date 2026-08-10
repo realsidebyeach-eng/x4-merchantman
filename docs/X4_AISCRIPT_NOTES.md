@@ -103,6 +103,51 @@ was actually created/queued successfully in the same pass. Don't design
 logic that assumes you can check the outcome of a `create_trade_order`
 call.
 
+### What `internal="true"` actually does (corrected 2026-08-10)
+
+Based on `order.trade.perform.xml` (the executor every `create_trade_order`
+queues) and the schema — this corrects an earlier, inaccurate claim that
+`internal=` provides retry throttling:
+
+1. **Blacklist enforcement — newly relevant for this mod.**
+   `order.trade.perform.xml:156,300` hard-aborts with
+   `TRADEPARTNER_BLACKLISTED` when the trade partner is on the player's
+   blacklist, gated on `$internalorder`. This mod's own upstream checks
+   (`match_use_blacklist`/sector `isblacklisted`) only ever screen
+   *external* search-space partners — the home station (the delivery
+   target) has never been blacklist-screened, since it's the user's own
+   explicit selection, not a search result. Setting `internal="true"`
+   makes this engine-level gate live for every leg, including
+   home-station deliveries, for the first time. The engine's own
+   exemption (skip the check if the target is in the ship's commander's
+   sector) doesn't apply here since this mod deliberately keeps ships
+   commander-less (see the `KNOWN_ISSUES.md` singleton on removing
+   `set_object_commander`). **Accepted as intentional**: honoring the
+   player's own blacklist against their own station is defensible
+   default behavior. If a player blacklists a sector containing one of
+   their own home stations, delivery legs to that station will now
+   silently abort (`TRADEPARTNER_BLACKLISTED` is in the engine's own
+   suppressed-error list, so no debug spam) and the ship will fall back
+   to stray-cargo handling instead of restocking home. See
+   `docs/KNOWN_ISSUES.md`'s "Not a bug — documented limitation" section.
+
+2. **`recurring=` is NOT a retry cooldown/backoff.**
+   `set_order_failed ... recurring="$internalorder"` and
+   `clear_recurring_order_failure` only affect the **order-system UI's
+   failure record** — schema (`common.xsd:34205-34209`): *"Only one
+   failure record of a recurring queue order exists in the order system
+   UI at any time, so adding this record will clear any previous
+   matching record."* There is no retry throttling, no backoff delay,
+   and nothing that limits how often a failing trade gets retried — this
+   mod's decision phase re-evaluates from scratch every pass regardless.
+   The real (much smaller) benefit: repeated identical failures collapse
+   into one UI notification instead of accumulating, and clear
+   automatically on success.
+
+3. A third gate (`order.trade.perform.xml:104`, a commander-resource
+   filter) is inert for this mod since ships are deliberately
+   commander-less.
+
 ### Multi-ware fill-cargo passes don't get the engine's automatic leg-pairing safety net
 
 `order.trade.perform.xml` — the executor order every `create_trade_order`

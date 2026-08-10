@@ -31,7 +31,9 @@ Full research trail: see project memory `project_create_trade_order_wait_interru
 
 1. Add `internal="true"` to every `create_trade_order` call in
    `aiscripts/sbe_stationtrader.xml`, to pick up the engine's built-in
-   recurring-failure cooldown/backoff for auto-generated trade orders.
+   recurring-failure UI deduplication (collapsing repeated identical
+   failures into one order-system notification, not a retry cooldown or
+   backoff) for auto-generated trade orders.
 2. Verify, precisely, what queue order this mod's commit-phase code
    actually produces for (a) classic mode / single-ware fill-cargo
    passes and (b) multi-ware fill-cargo passes — then document the
@@ -53,14 +55,26 @@ Full research trail: see project memory `project_create_trade_order_wait_interru
   is out of scope (YAGNI) — see [[feedback-storage-check-pitfalls]] on
   the risk of speculative changes to this timing-sensitive script.
 - Do not add blacklist-related config, UI, or logic changes.
-  `internal="true"`'s blacklist-enforcement effect is redundant with
-  this mod's own upstream checks (`$blacklistgroup` /
+  `internal="true"`'s blacklist-enforcement effect is **not** fully
+  redundant with this mod's own upstream checks (`$blacklistgroup` /
   `match_use_blacklist` / sector `isblacklisted` calls at
-  `sbe_stationtrader.xml:79-80,145,203,323,435,639,772`), which run
-  during the search phase — before a candidate offer is ever considered
-  — and are strictly better UX than an order-level rejection after the
-  ship has already committed to the trip. Those checks are unchanged by
-  this design.
+  `sbe_stationtrader.xml:86,140,157,215,335,447,653,786`): those checks
+  only ever screen *external* search-space partners found during the
+  search phase. The home station (the delivery target for every deliver
+  leg) has never been blacklist-screened by this mod's own logic, since
+  it's the user's own explicit selection, not a search result. Setting
+  `internal="true"` therefore makes the engine's blacklist gate newly
+  live specifically for home-station delivery legs — a real behavior
+  change, not a no-op. **This is accepted as intentional** (project
+  owner decision, 2026-08-10), not something to revert: a player who
+  blacklists a sector containing their own home station will now have
+  delivery legs to it silently abort, and that's considered correct
+  behavior (honoring the player's own blacklist against their own
+  station). See `docs/X4_AISCRIPT_NOTES.md`'s "What `internal=\"true\"`
+  actually does" subsection for the full mechanism and
+  `docs/KNOWN_ISSUES.md`'s "Not a bug — documented limitation" section
+  for the accepted-tradeoff entry. Those checks are otherwise unchanged
+  by this design.
 
 ## Part 1: `internal="true"`
 
@@ -75,17 +89,22 @@ no other logic, control flow, or variable changes.
 - `set_order_failed order="..." text="$failuretext" recurring="$internalorder"`
   (`order.trade.perform.xml:535`) and the matching
   `clear_recurring_order_failure` on success
-  (`order.trade.perform.xml:573-575`) only apply their cooldown/failure
-  bookkeeping when `internalorder` is true. This mod currently has zero
-  retry-limiting logic of its own (confirmed: no `failed`/`failure`/
-  `retry`/`cooldown` handling exists anywhere in
-  `sbe_stationtrader.xml` today) — so this closes a real, previously
-  totally-absent gap, at effectively zero implementation risk, since the
-  cooldown machinery lives entirely inside the engine's own trade-order
-  execution, not in this mod's own script logic.
+  (`order.trade.perform.xml:573-575`) only affect the **order-system
+  UI's failure record** — schema (`common.xsd:34205-34209`): "Only one
+  failure record of a recurring queue order exists in the order system
+  UI at any time, so adding this record will clear any previous matching
+  record." This is **not** a retry cooldown or backoff — there is no
+  throttling of how often a failing trade gets retried, and this mod's
+  decision phase re-evaluates from scratch every pass regardless. The
+  real (smaller) benefit: repeated identical failures collapse into one
+  UI notification instead of accumulating, and clear automatically on
+  success.
 - Blacklist enforcement gated by `$internalorder` elsewhere in
-  `order.trade.perform.xml` is **not** relied upon by this design — see
-  Non-goals above.
+  `order.trade.perform.xml` is newly relevant for home-station delivery
+  legs — see Non-goals above and
+  `docs/X4_AISCRIPT_NOTES.md`'s "What `internal=\"true\"` actually does"
+  subsection for the full explanation. It is not "redundant" with this
+  mod's own checks and is accepted as an intentional behavior change.
 
 ## Part 2: leg-pairing adjacency (verify and document)
 
@@ -184,9 +203,9 @@ Version bump: `20` → `21` (root `<aiscript ... version="N">`). Updated
 from this spec's original `19` → `20` after merging `main`, which had
 independently shipped the `mincargopercent` feature at version `20` in
 the meantime — `20` is no longer available. No `<patch sinceversion="21">`
-upgrade block needed — precedent from v16-19 (storage-clamp/scope fixes,
-also pure internal-logic changes with no param/structural changes) shows
-attribute-only or logic-only changes don't require one; only
+upgrade block needed — precedent from versions 13-19 (storage-clamp/scope
+fixes, also pure internal-logic changes with no param/structural changes)
+shows attribute-only or logic-only changes don't require one; only
 param-structure changes have historically needed a patch block (see
 existing blocks at versions 2,3,4,8,11,12,20). `content.xml`'s version
 stays at `1` per established convention.
