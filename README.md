@@ -30,10 +30,12 @@ control. Buying and selling are independently toggleable per ship via
    round-robin that keeps the wares roughly even — the same setting governs
    both roles.
 6. By default it fills its cargo hold across every wanted/sellable ware
-   before heading home or to a buyer, only returning short of a full hold
-   when wares genuinely aren't available — one gathering (or exporting)
-   trip instead of a round trip per ware (toggle this off for the classic
-   immediate buy-then-deliver behavior).
+   before heading home or to a buyer, returning short of a full hold only
+   when wares genuinely aren't available or once free cargo space drops
+   below a configurable percent of capacity (so it stops chasing one more
+   stop) — one gathering (or exporting) trip instead of a round trip per
+   ware (toggle this off for the classic immediate buy-then-deliver
+   behavior).
 7. When buying, it never pays above a price ceiling you set — either a flat
    max price, or a percentage below the home station's own price for that
    ware. When selling, it never accepts less than the home station's own

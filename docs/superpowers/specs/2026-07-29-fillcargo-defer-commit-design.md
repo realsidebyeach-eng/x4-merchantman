@@ -197,6 +197,16 @@ verification should watch specifically for this symptom (a `committing
 mistaken for a new regression when it's actually this known, pre-existing
 gap.
 
+**Related, separate gap (documented, also not fixed):** this same
+two-pass commit-phase ordering also means multi-ware passes don't benefit
+from X4's own engine-level automatic leg-pairing failure-cancellation
+(single-ware passes and classic mode do, automatically). See the
+"Multi-ware fill-cargo passes don't get the engine's automatic
+leg-pairing safety net" subsection in `docs/X4_AISCRIPT_NOTES.md` for the
+full mechanism and citation, and
+`docs/superpowers/specs/2026-08-09-internal-flag-and-leg-pairing-doc-design.md`
+for why this is an accepted tradeoff rather than something to fix.
+
 ## Versioning
 
 Bump the aiscript `version` attribute (currently 18, so 19).
